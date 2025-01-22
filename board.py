@@ -141,15 +141,15 @@ for work_item_id in work_item_ids:
                 pr_details = get_pr_details(link["id"], link["repository_id"])
                 if args.markdown:
                     if args.short:
-                        print(f"* PR !{link['id']} → `{pr_details['repository']}`; Target: `{pr_details['target_branch']}`")
+                        print(f"* PR !{link['id']} → `{pr_details['repository']}` → `{pr_details['target_branch']}`")
                     else:
-                        print(f"* PR !{link['id']} → `{pr_details['repository']}`; Target: `{pr_details['target_branch']}`")
+                        print(f"* PR !{link['id']} → `{pr_details['repository']}` → `{pr_details['target_branch']}`")
                         print(f"  * {pr_details['title']}")
                 else:
                     if args.short:
-                        print(f"    PR !{link['id']} → {pr_details['repository']}; Target: {pr_details['target_branch']}")
+                        print(f"    PR !{link['id']} → {pr_details['repository']} → {pr_details['target_branch']}")
                     else:
-                        print(f"    PR !{link['id']} → {pr_details['repository']}; Target: {pr_details['target_branch']} -> {pr_details['title']}")
+                        print(f"    PR !{link['id']} → {pr_details['repository']} → {pr_details['target_branch']} -> {pr_details['title']}")
             except requests.exceptions.HTTPError as e:
                 error_msg = f"Error getting PR !{link['id']}: {str(e)}"
                 print(f"* {error_msg}" if args.markdown else f"    {error_msg}")
@@ -180,15 +180,15 @@ for work_item_id in work_item_ids:
                     pr_details = get_pr_details(link["id"], link["repository_id"])
                     if args.markdown:
                         if args.short:
-                            child_output.append(f"* PR !{link['id']} → `{pr_details['repository']}`; Target: `{pr_details['target_branch']}`")
+                            child_output.append(f"* PR !{link['id']} → `{pr_details['repository']}` → `{pr_details['target_branch']}`")
                         else:
-                            child_output.append(f"* PR !{link['id']} → `{pr_details['repository']}`; Target: `{pr_details['target_branch']}`")
+                            child_output.append(f"* PR !{link['id']} → `{pr_details['repository']}` → `{pr_details['target_branch']}`")
                             child_output.append(f"  * {pr_details['title']}")
                     else:
                         if args.short:
-                            child_output.append(f"        PR !{link['id']} → {pr_details['repository']}; Target: {pr_details['target_branch']}")
+                            child_output.append(f"        PR !{link['id']} → {pr_details['repository']} → {pr_details['target_branch']}")
                         else:
-                            child_output.append(f"        PR !{link['id']} → {pr_details['repository']}; Target: {pr_details['target_branch']} -> {pr_details['title']}")
+                            child_output.append(f"        PR !{link['id']} → {pr_details['repository']} → {pr_details['target_branch']} -> {pr_details['title']}")
                 except requests.exceptions.HTTPError as e:
                     error_msg = f"Error getting PR !{link['id']}: {str(e)}"
                     child_output.append(f"* {error_msg}" if args.markdown else f"        {error_msg}")
