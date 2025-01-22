@@ -74,7 +74,8 @@ def get_pr_details(pr_id, repository_id):
     return {
         "repository": pr["repository"]["name"],
         "source_branch": pr["sourceRefName"],
-        "target_branch": pr["targetRefName"]
+        "target_branch": pr["targetRefName"],
+        "title": pr["title"]
     }
 
 # Тег для фильтрации
@@ -94,6 +95,6 @@ for work_item_id in work_item_ids:
     for link in pr_links:
         try:
             pr_details = get_pr_details(link["id"], link["repository_id"])
-            print(f"    PR #{link['id']} → {pr_details['repository']}; Target: {pr_details['target_branch']}")
+            print(f"    PR #{link['id']} → {pr_details['repository']}; Target: {pr_details['target_branch']} -> {pr_details['title']}")
         except requests.exceptions.HTTPError as e:
             print(f"    Error getting PR #{link['id']}: {str(e)}")
