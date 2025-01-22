@@ -40,8 +40,6 @@ def get_related_pr_links(work_item_id):
     work_item_type = work_item_data.get('fields', {}).get('System.WorkItemType', 'Unknown Type')
     work_item_title = work_item_data.get('fields', {}).get('System.Title', 'No title')
     
-    print(f"\nWI {work_item_id} ({work_item_type}): {work_item_title}")
-    
     for rel in relations:
         if rel["rel"] == "ArtifactLink":
             try:
@@ -54,13 +52,13 @@ def get_related_pr_links(work_item_id):
                         repo_id = full_id.split("%2F")[0]
                         pr_links.append({
                             "id": pr_id,
-                            "repository_id": repo_id
+                            "repository_id": repo_id,
+                            "work_item_id": work_item_id,
+                            "work_item_type": work_item_type,
+                            "work_item_title": work_item_title
                         })
             except (KeyError, IndexError) as e:
                 continue
-    
-    if not pr_links:
-        print("    No pull requests found")
     
     return pr_links
 
@@ -81,6 +79,24 @@ def get_pr_details(pr_id, repository_id):
 # Тег для фильтрации
 TAG = "AddToUat"
 
+def get_child_work_items(work_item_id):
+    url = f"https://dev.azure.com/{ORG}/{PROJECT}/_apis/wit/workitems/{work_item_id}?$expand=relations&api-version=7.0"
+    response = requests.get(url, headers=get_auth_header())
+    response.raise_for_status()
+    relations = response.json().get("relations", [])
+    
+    child_ids = []
+    for rel in relations:
+        if rel["rel"] == "System.LinkTypes.Hierarchy-Forward":  # This is a child link
+            try:
+                # Extract child ID from URL
+                child_url = rel["url"]
+                child_id = child_url.split('/')[-1]
+                child_ids.append(int(child_id))
+            except (KeyError, IndexError):
+                continue
+    return child_ids
+
 # Update the main loop
 print("\nSearching for work items with tag:", TAG)
 work_item_ids = get_work_items_by_tag(TAG)
@@ -91,10 +107,39 @@ if not work_item_ids:
 
 print("\nAnalyzing pull requests...")
 for work_item_id in work_item_ids:
-    pr_links = get_related_pr_links(work_item_id)
-    for link in pr_links:
-        try:
-            pr_details = get_pr_details(link["id"], link["repository_id"])
-            print(f"    PR #{link['id']} → {pr_details['repository']}; Target: {pr_details['target_branch']} -> {pr_details['title']}")
-        except requests.exceptions.HTTPError as e:
-            print(f"    Error getting PR #{link['id']}: {str(e)}")
+    pr_links = sorted(get_related_pr_links(work_item_id), key=lambda x: int(x["id"]))
+    if pr_links:  # Only process work items with PRs
+        print(f"\nWI #{work_item_id} ({pr_links[0]['work_item_type']}): {pr_links[0]['work_item_title']}")
+        for link in pr_links:
+            try:
+                pr_details = get_pr_details(link["id"], link["repository_id"])
+                print(f"    PR !{link['id']} → {pr_details['repository']}; Target: {pr_details['target_branch']} -> {pr_details['title']}")
+            except requests.exceptions.HTTPError as e:
+                print(f"    Error getting PR !{link['id']}: {str(e)}")
+    
+    # Check child work items
+    child_ids = get_child_work_items(work_item_id)
+    if child_ids:
+        children_with_prs = False
+        child_output = []
+        all_child_prs = []
+        
+        for child_id in child_ids:
+            child_pr_links = get_related_pr_links(child_id)
+            if child_pr_links:
+                all_child_prs.extend(child_pr_links)
+                children_with_prs = True
+        
+        if children_with_prs:
+            child_output.append("    Child items:")
+            # Sort all child PRs by PR number
+            all_child_prs.sort(key=lambda x: int(x["id"]))
+            
+            for link in all_child_prs:
+                try:
+                    pr_details = get_pr_details(link["id"], link["repository_id"])
+                    child_output.append(f"        PR !{link['id']} → {pr_details['repository']}; Target: {pr_details['target_branch']} -> {pr_details['title']}")
+                except requests.exceptions.HTTPError as e:
+                    child_output.append(f"        Error getting PR !{link['id']}: {str(e)}")
+            
+            print("\n".join(child_output))
