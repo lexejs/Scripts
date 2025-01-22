@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Azure DevOps PR Tracker</title>
+    <style>
+        body { font-family: Arial; max-width: 1200px; margin: 20px auto; padding: 0 20px; }
+        .form { margin-bottom: 20px; }
+        input, button { margin: 5px; padding: 5px; }
+        .error { color: red; }
+        pre { white-space: pre-wrap; }
+        .markdown { background: #f5f5f5; padding: 20px; border-radius: 5px; }
+        .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3;
+                  border-top: 3px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .loading { color: #666; margin-left: 10px; }
+        .form-group { margin: 10px 0; }
+        .form-group label { display: inline-block; width: 120px; }
+        .copy-button { margin-left: 10px; padding: 5px 10px; cursor: pointer; }
+        .output-container { position: relative; }
+        .form-row { 
+            display: flex; 
+            align-items: center; 
+            gap: 20px; 
+            margin: 10px 0; 
+        }
+        .form-group { 
+            flex: 1; 
+            margin: 0; 
+            min-width: 200px;
+        }
+        .form-group label { 
+            display: block; 
+            margin-bottom: 3px; 
+            font-size: 0.9em; 
+            color: #666; 
+        }
+        .form-group input[type="text"],
+        .form-group input[type="password"] { 
+            width: 100%; 
+            box-sizing: border-box;
+        }
+        .options-group {
+            margin: 10px 0;
+        }
+        .collapsible {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .collapsible-header {
+            cursor: pointer;
+            user-select: none;
+        }
+        .collapsible-header:before {
+            content: '▼';
+            margin-right: 5px;
+            display: inline-block;
+            transition: transform 0.2s;
+        }
+        .collapsible.collapsed .collapsible-header:before {
+            transform: rotate(-90deg);
+        }
+        .collapsible.collapsed .collapsible-content {
+            visibility: hidden;
+            height: 0;
+            overflow: hidden;
+            padding: 0;
+            margin: 0;
+        }
+        .collapsible .collapsible-content {
+            visibility: visible;
+            height: auto;
+            transition: visibility 0s, height 0.2s ease-out;
+        }
+        .invalid {
+            border-color: red !important;
+        }
+    </style>
+</head>
+<body>
+    <form id="azureForm" autocomplete="on">
+        <div class="collapsible collapsed">
+            <div class="collapsible-header">Azure DevOps Settings</div>
+            <div class="collapsible-content">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="org">Organization:</label>
+                        <input type="text" 
+                               id="org" 
+                               name="org" 
+                               value="dtstac" 
+                               required
+                               autocomplete="username">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="project">Project:</label>
+                        <input type="text" 
+                               id="project" 
+                               name="project" 
+                               value="K1DE"
+                               required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="pat">Access Token:</label>
+                        <input type="password" 
+                               id="pat" 
+                               name="pat" 
+                               required
+                               autocomplete="current-password">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="tag">Tag:</label>
+                <input type="text" 
+                       id="tag" 
+                       name="tag" 
+                       value="AddToUat"
+                       required>
+            </div>
+
+            <div class="options-group">
+                <label><input type="checkbox" id="shortOutput" name="shortOutput"> Short output</label>
+                <label><input type="checkbox" id="markdownOutput" name="markdownOutput"> Markdown</label>
+            </div>
+
+            <div>
+                <button type="submit" id="fetchButton">Get Work Items</button>
+                <span id="loading" style="display: none">
+                    <div class="spinner"></div>
+                    <span class="loading">Loading...</span>
+                </span>
+            </div>
+        </div>
+    </form>
+
+    <div class="output-container">
+        <div id="output"></div>
+        <button id="copyButton" class="copy-button" style="display: none">Copy to Clipboard</button>
+    </div>
+
+    <script>
+        window.onload = function() {
+            const savedPat = localStorage.getItem('azure_pat');
+            if (savedPat) {
+                document.getElementById('pat').value = savedPat;
+            }
+            
+            // Check if all required fields in collapsible section are filled
+            const collapsible = document.querySelector('.collapsible');
+            const requiredFields = collapsible.querySelectorAll('input[required]');
+            const allFieldsFilled = Array.from(requiredFields).every(input => input.value.trim());
+            
+            // Expand section if any required field is empty
+            if (!allFieldsFilled) {
+                collapsible.classList.remove('collapsed');
+            }
+
+            // Add collapsible functionality
+            document.querySelector('.collapsible-header').addEventListener('click', function() {
+                const collapsible = this.parentElement;
+                const requiredFields = collapsible.querySelectorAll('input[required]');
+                const hasInvalidFields = Array.from(requiredFields).some(input => 
+                    input.classList.contains('invalid') || !input.value.trim()
+                );
+
+                // Allow toggling only if no validation errors
+                if (!hasInvalidFields) {
+                    collapsible.classList.toggle('collapsed');
+                } else if (collapsible.classList.contains('collapsed')) {
+                    // Always allow expanding if there are errors
+                    collapsible.classList.remove('collapsed');
+                }
+            });
+        }
+
+        // Form validation
+        document.getElementById('azureForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Reset validation
+            this.querySelectorAll('input[required]').forEach(input => {
+                input.classList.remove('invalid');
+            });
+
+            let isValid = true;
+            let firstInvalidInput = null;
+
+            // Check all required fields
+            this.querySelectorAll('input[required]').forEach(input => {
+                if (!input.value.trim()) {
+                    input.classList.add('invalid');
+                    isValid = false;
+                    if (!firstInvalidInput) {
+                        firstInvalidInput = input;
+                    }
+                }
+            });
+
+            if (!isValid) {
+                firstInvalidInput.focus();
+                return;
+            }
+
+            // If form is valid, collapse the section before sending
+            const collapsible = document.querySelector('.collapsible');
+            collapsible.classList.add('collapsed');
+            
+            await getWorkItems();
+        });
+
+        // Add input validation on change
+        document.querySelectorAll('input[required]').forEach(input => {
+            input.addEventListener('input', function() {
+                if (this.value.trim()) {
+                    this.classList.remove('invalid');
+                } else {
+                    this.classList.add('invalid');
+                }
+            });
+        });
+
+        async function getWorkItems() {
+            const org = document.getElementById('org').value;
+            const project = document.getElementById('project').value;
+            const tag = document.getElementById('tag').value;
+            const pat = document.getElementById('pat').value;
+            
+            localStorage.setItem('azure_pat', pat);
+
+            const isShort = document.getElementById('shortOutput').checked;
+            const isMarkdown = document.getElementById('markdownOutput').checked;
+            const output = document.getElementById('output');
+            const loading = document.getElementById('loading');
+            const fetchButton = document.getElementById('fetchButton');
+
+            const headers = {
+                'Authorization': 'Basic ' + btoa(':' + pat),
+                'Content-Type': 'application/json'
+            };
+
+            try {
+                loading.style.display = 'inline-block';
+                fetchButton.disabled = true;
+                document.getElementById('copyButton').style.display = 'none';
+                output.innerHTML = `<pre class="${isMarkdown ? 'markdown' : ''}"></pre>`;
+                const resultElement = output.querySelector('pre');
+                
+                // Initial header
+                resultElement.textContent = isMarkdown ? `## Work items with tag: ${tag}\n\n` : '';
+
+                // Get work items by tag
+                const wiqlQuery = {
+                    query: `SELECT [System.Id], [System.Title], [System.WorkItemType]
+                           FROM WorkItems
+                           WHERE [System.Tags] CONTAINS '${tag}'
+                           AND [System.WorkItemType] IN ('Product Backlog Item', 'Bug', 'Issue', 'Defect', 'Incident', 'Task')
+                           ORDER BY [System.WorkItemType], [System.Id]`
+                };
+
+                const workItems = await fetch(`https://dev.azure.com/${org}/${project}/_apis/wit/wiql?api-version=7.0`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(wiqlQuery)
+                }).then(r => r.json());
+
+                // Process each work item
+                for (const item of workItems.workItems) {
+                    const workItem = await fetch(`https://dev.azure.com/${org}/${project}/_apis/wit/workitems/${item.id}?$expand=relations&api-version=7.0`, {
+                        headers
+                    }).then(r => r.json());
+
+                    // Get PR links for main work item
+                    const prLinks = workItem.relations
+                        ?.filter(rel => rel.rel === 'ArtifactLink' && rel.attributes.name === 'Pull Request')
+                        .map(rel => ({
+                            id: rel.url.split('/').pop().split('%2F').pop(),
+                            repository_id: rel.url.split('/').pop().split('%2F')[0]
+                        }))
+                        .sort((a, b) => parseInt(a.id) - parseInt(b.id)) || [];
+
+                    if (prLinks.length) {
+                        // Add work item info
+                        const workItemLine = isMarkdown 
+                            ? (isShort 
+                                ? `### #${item.id}\n`
+                                : `### #${item.id} (${workItem.fields['System.WorkItemType']})\n> ${workItem.fields['System.Title']}\n\n`)
+                            : (isShort
+                                ? `\n#${item.id}\n`
+                                : `\n#${item.id} (${workItem.fields['System.WorkItemType']}): ${workItem.fields['System.Title']}\n`);
+                        
+                        resultElement.textContent += workItemLine;
+
+                        // Add PR details for main work item
+                        for (const link of prLinks) {
+                            const pr = await fetch(`https://dev.azure.com/${org}/${project}/_apis/git/pullrequests/${link.id}?api-version=7.0`, {
+                                headers
+                            }).then(r => r.json());
+
+                            const prLine = isMarkdown
+                                ? `* PR !${link.id} → \`${pr.repository.name}\` → \`${pr.targetRefName}\`${isShort ? '' : `\n  * ${pr.title}`}\n`
+                                : `    PR !${link.id} → ${pr.repository.name} → ${pr.targetRefName}${isShort ? '' : ` -> ${pr.title}`}\n`;
+                            
+                            resultElement.textContent += prLine;
+                        }
+
+                        // Get child work items
+                        const childIds = workItem.relations
+                            ?.filter(rel => rel.rel === 'System.LinkTypes.Hierarchy-Forward')
+                            .map(rel => rel.url.split('/').pop()) || [];
+
+                        if (childIds.length) {
+                            let hasChildPRs = false;
+                            let childOutput = '';
+
+                            for (const childId of childIds) {
+                                const childWorkItem = await fetch(`https://dev.azure.com/${org}/${project}/_apis/wit/workitems/${childId}?$expand=relations&api-version=7.0`, {
+                                    headers
+                                }).then(r => r.json());
+
+                                const childPRLinks = childWorkItem.relations
+                                    ?.filter(rel => rel.rel === 'ArtifactLink' && rel.attributes.name === 'Pull Request')
+                                    .map(rel => ({
+                                        id: rel.url.split('/').pop().split('%2F').pop(),
+                                        repository_id: rel.url.split('/').pop().split('%2F')[0]
+                                    }))
+                                    .sort((a, b) => parseInt(a.id) - parseInt(b.id)) || [];
+
+                                if (childPRLinks.length) {
+                                    if (!hasChildPRs) {
+                                        hasChildPRs = true;
+                                        childOutput = isMarkdown ? '\n#### Child items\n' : '\n    Child items:\n';
+                                    }
+
+                                    for (const link of childPRLinks) {
+                                        const pr = await fetch(`https://dev.azure.com/${org}/${project}/_apis/git/pullrequests/${link.id}?api-version=7.0`, {
+                                            headers
+                                        }).then(r => r.json());
+
+                                        const prLine = isMarkdown
+                                            ? `* PR !${link.id} → \`${pr.repository.name}\` → \`${pr.targetRefName}\`${isShort ? '' : `\n  * ${pr.title}`}\n`
+                                            : `        PR !${link.id} → ${pr.repository.name} → ${pr.targetRefName}${isShort ? '' : ` -> ${pr.title}`}\n`;
+                                        
+                                        childOutput += prLine;
+                                    }
+                                }
+                            }
+
+                            if (hasChildPRs) {
+                                resultElement.textContent += childOutput;
+                            }
+                        }
+                    }
+                }
+
+                // Show copy button after successful load
+                document.getElementById('copyButton').style.display = 'inline-block';
+            } catch (error) {
+                output.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                document.getElementById('copyButton').style.display = 'none';
+            } finally {
+                loading.style.display = 'none';
+                fetchButton.disabled = false;
+            }
+        }
+
+        // Add copy button handler
+        document.getElementById('copyButton').addEventListener('click', function() {
+            const output = document.querySelector('#output pre');
+            if (output) {
+                navigator.clipboard.writeText(output.textContent)
+                    .then(() => alert('Copied to clipboard!'))
+                    .catch(err => alert('Failed to copy: ' + err));
+            }
+        });
+    </script>
+</body>
+</html> 
