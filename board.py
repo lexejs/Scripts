@@ -1,5 +1,6 @@
 import requests
 import base64
+import argparse
 
 # Настройки организации и проекта
 ORG = "dtstac"
@@ -97,25 +98,61 @@ def get_child_work_items(work_item_id):
                 continue
     return child_ids
 
+# Add at the beginning of the file, after imports
+def parse_args():
+    parser = argparse.ArgumentParser(description='Get Azure DevOps work items and their PRs')
+    parser.add_argument('--short', '-s', action='store_true', 
+                       help='Show short output without descriptions')
+    parser.add_argument('--markdown', '-m', action='store_true',
+                       help='Output in Markdown format')
+    return parser.parse_args()
+
 # Update the main loop
-print("\nSearching for work items with tag:", TAG)
+args = parse_args()
+
+if args.markdown:
+    print(f"\n## Work items with tag: {TAG}\n")
+else:
+    print("\nWork items with tag:", TAG)
+
 work_item_ids = get_work_items_by_tag(TAG)
 
 if not work_item_ids:
     print("No work items found with the specified tag")
     exit()
 
-print("\nAnalyzing pull requests...")
 for work_item_id in work_item_ids:
     pr_links = sorted(get_related_pr_links(work_item_id), key=lambda x: int(x["id"]))
     if pr_links:  # Only process work items with PRs
-        print(f"\nWI #{work_item_id} ({pr_links[0]['work_item_type']}): {pr_links[0]['work_item_title']}")
+        if args.markdown:
+            if args.short:
+                print(f"### #{work_item_id}")
+            else:
+                print(f"### #{work_item_id} ({pr_links[0]['work_item_type']})")
+                print(f"> {pr_links[0]['work_item_title']}\n")
+        else:
+            if args.short:
+                print(f"\n#{work_item_id}")
+            else:
+                print(f"\n#{work_item_id} ({pr_links[0]['work_item_type']}): {pr_links[0]['work_item_title']}")
+        
         for link in pr_links:
             try:
                 pr_details = get_pr_details(link["id"], link["repository_id"])
-                print(f"    PR !{link['id']} → {pr_details['repository']}; Target: {pr_details['target_branch']} -> {pr_details['title']}")
+                if args.markdown:
+                    if args.short:
+                        print(f"* PR !{link['id']} → `{pr_details['repository']}`; Target: `{pr_details['target_branch']}`")
+                    else:
+                        print(f"* PR !{link['id']} → `{pr_details['repository']}`; Target: `{pr_details['target_branch']}`")
+                        print(f"  * {pr_details['title']}")
+                else:
+                    if args.short:
+                        print(f"    PR !{link['id']} → {pr_details['repository']}; Target: {pr_details['target_branch']}")
+                    else:
+                        print(f"    PR !{link['id']} → {pr_details['repository']}; Target: {pr_details['target_branch']} -> {pr_details['title']}")
             except requests.exceptions.HTTPError as e:
-                print(f"    Error getting PR !{link['id']}: {str(e)}")
+                error_msg = f"Error getting PR !{link['id']}: {str(e)}"
+                print(f"* {error_msg}" if args.markdown else f"    {error_msg}")
     
     # Check child work items
     child_ids = get_child_work_items(work_item_id)
@@ -131,15 +168,29 @@ for work_item_id in work_item_ids:
                 children_with_prs = True
         
         if children_with_prs:
-            child_output.append("    Child items:")
-            # Sort all child PRs by PR number
+            if args.markdown:
+                child_output.append("#### Child items")
+            else:
+                child_output.append("    Child items:")
+            
             all_child_prs.sort(key=lambda x: int(x["id"]))
             
             for link in all_child_prs:
                 try:
                     pr_details = get_pr_details(link["id"], link["repository_id"])
-                    child_output.append(f"        PR !{link['id']} → {pr_details['repository']}; Target: {pr_details['target_branch']} -> {pr_details['title']}")
+                    if args.markdown:
+                        if args.short:
+                            child_output.append(f"* PR !{link['id']} → `{pr_details['repository']}`; Target: `{pr_details['target_branch']}`")
+                        else:
+                            child_output.append(f"* PR !{link['id']} → `{pr_details['repository']}`; Target: `{pr_details['target_branch']}`")
+                            child_output.append(f"  * {pr_details['title']}")
+                    else:
+                        if args.short:
+                            child_output.append(f"        PR !{link['id']} → {pr_details['repository']}; Target: {pr_details['target_branch']}")
+                        else:
+                            child_output.append(f"        PR !{link['id']} → {pr_details['repository']}; Target: {pr_details['target_branch']} -> {pr_details['title']}")
                 except requests.exceptions.HTTPError as e:
-                    child_output.append(f"        Error getting PR !{link['id']}: {str(e)}")
+                    error_msg = f"Error getting PR !{link['id']}: {str(e)}"
+                    child_output.append(f"* {error_msg}" if args.markdown else f"        {error_msg}")
             
             print("\n".join(child_output))
