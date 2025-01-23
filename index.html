@@ -312,8 +312,8 @@
                             }).then(r => r.json());
 
                             const prLine = isMarkdown
-                                ? `* PR !${link.id} → \`${pr.repository.name}\` → \`${pr.targetRefName}\`${isShort ? '' : `\n  * ${pr.title}`}\n`
-                                : `    PR !${link.id} → ${pr.repository.name} → ${pr.targetRefName}${isShort ? '' : ` -> ${pr.title}`}\n`;
+                                ? `* PR !${link.id} → \`${pr.repository.name}\` → \`${pr.targetRefName.replace('refs/heads/', '')}\`${isShort ? '' : `\n  * ${pr.title}`}\n`
+                                : `    PR !${link.id} → ${pr.repository.name} → ${pr.targetRefName.replace('refs/heads/', '')}${isShort ? '' : ` -> ${pr.title}`}\n`;
                             
                             resultElement.textContent += prLine;
                         }
@@ -352,8 +352,8 @@
                                         }).then(r => r.json());
 
                                         const prLine = isMarkdown
-                                            ? `* PR !${link.id} → \`${pr.repository.name}\` → \`${pr.targetRefName}\`${isShort ? '' : `\n  * ${pr.title}`}\n`
-                                            : `        PR !${link.id} → ${pr.repository.name} → ${pr.targetRefName}${isShort ? '' : ` -> ${pr.title}`}\n`;
+                                            ? `* PR !${link.id} → \`${pr.repository.name}\` → \`${pr.targetRefName.replace('refs/heads/', '')}\`${isShort ? '' : `\n  * ${pr.title}`}\n`
+                                            : `        PR !${link.id} → ${pr.repository.name} → ${pr.targetRefName.replace('refs/heads/', '')}${isShort ? '' : ` -> ${pr.title}`}\n`;
                                         
                                         childOutput += prLine;
                                     }
