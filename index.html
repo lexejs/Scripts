@@ -133,6 +133,14 @@
                        required>
             </div>
 
+            <div class="form-group">
+                <label for="repoFilter">Repository Filter:</label>
+                <input type="text" 
+                       id="repoFilter" 
+                       name="repoFilter" 
+                       placeholder="Optional filter">
+            </div>
+
             <div class="options-group">
                 <label><input type="checkbox" id="shortOutput" name="shortOutput"> Short output</label>
                 <label><input type="checkbox" id="markdownOutput" name="markdownOutput"> Markdown</label>
@@ -155,10 +163,27 @@
 
     <script>
         window.onload = function() {
-            const savedPat = localStorage.getItem('azure_pat');
-            if (savedPat) {
-                document.getElementById('pat').value = savedPat;
-            }
+            // Load saved parameters from localStorage
+            const savedParams = {
+                org: localStorage.getItem('azure_org'),
+                project: localStorage.getItem('azure_project'),
+                tag: localStorage.getItem('azure_tag'),
+                repoFilter: localStorage.getItem('azure_repoFilter'),
+                pat: localStorage.getItem('azure_pat'),
+                shortOutput: localStorage.getItem('azure_shortOutput') === 'true',
+                markdownOutput: localStorage.getItem('azure_markdownOutput') === 'true'
+            };
+            
+            // Apply saved values to form
+            if (savedParams.org) document.getElementById('org').value = savedParams.org;
+            if (savedParams.project) document.getElementById('project').value = savedParams.project;
+            if (savedParams.tag) document.getElementById('tag').value = savedParams.tag;
+            if (savedParams.repoFilter) document.getElementById('repoFilter').value = savedParams.repoFilter;
+            if (savedParams.pat) document.getElementById('pat').value = savedParams.pat;
+            
+            // Set checkboxes
+            document.getElementById('shortOutput').checked = savedParams.shortOutput;
+            document.getElementById('markdownOutput').checked = savedParams.markdownOutput;
             
             // Check if all required fields in collapsible section are filled
             const collapsible = document.querySelector('.collapsible');
@@ -239,11 +264,19 @@
             const project = document.getElementById('project').value;
             const tag = document.getElementById('tag').value;
             const pat = document.getElementById('pat').value;
-            
-            localStorage.setItem('azure_pat', pat);
-
+            const repoFilter = document.getElementById('repoFilter').value.trim();
             const isShort = document.getElementById('shortOutput').checked;
             const isMarkdown = document.getElementById('markdownOutput').checked;
+            
+            // Save all parameters to localStorage
+            localStorage.setItem('azure_org', org);
+            localStorage.setItem('azure_project', project);
+            localStorage.setItem('azure_tag', tag);
+            localStorage.setItem('azure_repoFilter', repoFilter);
+            localStorage.setItem('azure_pat', pat);
+            localStorage.setItem('azure_shortOutput', isShort);
+            localStorage.setItem('azure_markdownOutput', isMarkdown);
+
             const output = document.getElementById('output');
             const loading = document.getElementById('loading');
             const fetchButton = document.getElementById('fetchButton');
@@ -278,7 +311,12 @@
                     body: JSON.stringify(wiqlQuery)
                 }).then(r => r.json());
 
-                // Process each work item
+                // Object to store PRs grouped by repository
+                const repositoryPRs = {};
+                // Track PR IDs to avoid duplicates
+                const processedPRs = new Set();
+                
+                // Process each work item and collect all PRs
                 for (const item of workItems.workItems) {
                     const workItem = await fetch(`https://dev.azure.com/${org}/${project}/_apis/wit/workitems/${item.id}?$expand=relations&api-version=7.0`, {
                         headers
@@ -293,75 +331,184 @@
                         }))
                         .sort((a, b) => parseInt(a.id) - parseInt(b.id)) || [];
 
-                    if (prLinks.length) {
-                        // Add work item info
-                        const workItemLine = isMarkdown 
-                            ? (isShort 
-                                ? `### #${item.id}\n`
-                                : `### #${item.id} (${workItem.fields['System.WorkItemType']})\n> ${workItem.fields['System.Title']}\n\n`)
-                            : (isShort
-                                ? `\n#${item.id}\n`
-                                : `\n#${item.id} (${workItem.fields['System.WorkItemType']}): ${workItem.fields['System.Title']}\n`);
+                    // Process PRs for main work item
+                    for (const link of prLinks) {
+                        // Create a unique key for this PR
+                        const prKey = `${link.repository_id}/${link.id}`;
                         
-                        resultElement.textContent += workItemLine;
+                        // Skip if we've already processed this PR
+                        if (processedPRs.has(prKey)) continue;
+                        processedPRs.add(prKey);
+                        
+                        const pr = await fetch(`https://dev.azure.com/${org}/${project}/_apis/git/pullrequests/${link.id}?api-version=7.0`, {
+                            headers
+                        }).then(r => r.json());
+                        
+                        if (!repositoryPRs[pr.repository.name]) {
+                            repositoryPRs[pr.repository.name] = {
+                                targetBranches: {},
+                                prs: []
+                            };
+                        }
+                        
+                        const targetBranch = pr.targetRefName.replace('refs/heads/', '');
+                        if (!repositoryPRs[pr.repository.name].targetBranches[targetBranch]) {
+                            repositoryPRs[pr.repository.name].targetBranches[targetBranch] = [];
+                        }
+                        
+                        repositoryPRs[pr.repository.name].targetBranches[targetBranch].push({
+                            pr: pr,
+                            workItemId: item.id,
+                            workItemType: workItem.fields['System.WorkItemType'],
+                            workItemTitle: workItem.fields['System.Title'],
+                            isChild: false
+                        });
+                    }
 
-                        // Add PR details for main work item
-                        for (const link of prLinks) {
+                    // Get child work items and their PRs
+                    const childIds = workItem.relations
+                        ?.filter(rel => rel.rel === 'System.LinkTypes.Hierarchy-Forward')
+                        .map(rel => rel.url.split('/').pop()) || [];
+
+                    for (const childId of childIds) {
+                        const childWorkItem = await fetch(`https://dev.azure.com/${org}/${project}/_apis/wit/workitems/${childId}?$expand=relations&api-version=7.0`, {
+                            headers
+                        }).then(r => r.json());
+
+                        const childPRLinks = childWorkItem.relations
+                            ?.filter(rel => rel.rel === 'ArtifactLink' && rel.attributes.name === 'Pull Request')
+                            .map(rel => ({
+                                id: rel.url.split('/').pop().split('%2F').pop(),
+                                repository_id: rel.url.split('/').pop().split('%2F')[0]
+                            }))
+                            .sort((a, b) => parseInt(a.id) - parseInt(b.id)) || [];
+
+                        // Process PRs for child work items
+                        for (const link of childPRLinks) {
+                            // Create a unique key for this PR
+                            const prKey = `${link.repository_id}/${link.id}`;
+                            
+                            // Skip if we've already processed this PR
+                            if (processedPRs.has(prKey)) continue;
+                            processedPRs.add(prKey);
+                            
                             const pr = await fetch(`https://dev.azure.com/${org}/${project}/_apis/git/pullrequests/${link.id}?api-version=7.0`, {
                                 headers
                             }).then(r => r.json());
-
-                            const prLine = isMarkdown
-                                ? `* PR !${link.id} → \`${pr.repository.name}\` → \`${pr.targetRefName.replace('refs/heads/', '')}\`${isShort ? '' : `\n  * ${pr.title}`}\n`
-                                : `    PR !${link.id} → ${pr.repository.name} → ${pr.targetRefName.replace('refs/heads/', '')}${isShort ? '' : ` -> ${pr.title}`}\n`;
                             
-                            resultElement.textContent += prLine;
-                        }
-
-                        // Get child work items
-                        const childIds = workItem.relations
-                            ?.filter(rel => rel.rel === 'System.LinkTypes.Hierarchy-Forward')
-                            .map(rel => rel.url.split('/').pop()) || [];
-
-                        if (childIds.length) {
-                            let hasChildPRs = false;
-                            let childOutput = '';
-
-                            for (const childId of childIds) {
-                                const childWorkItem = await fetch(`https://dev.azure.com/${org}/${project}/_apis/wit/workitems/${childId}?$expand=relations&api-version=7.0`, {
-                                    headers
-                                }).then(r => r.json());
-
-                                const childPRLinks = childWorkItem.relations
-                                    ?.filter(rel => rel.rel === 'ArtifactLink' && rel.attributes.name === 'Pull Request')
-                                    .map(rel => ({
-                                        id: rel.url.split('/').pop().split('%2F').pop(),
-                                        repository_id: rel.url.split('/').pop().split('%2F')[0]
-                                    }))
-                                    .sort((a, b) => parseInt(a.id) - parseInt(b.id)) || [];
-
-                                if (childPRLinks.length) {
-                                    if (!hasChildPRs) {
-                                        hasChildPRs = true;
-                                        childOutput = isMarkdown ? '\n#### Child items\n' : '\n    Child items:\n';
-                                    }
-
-                                    for (const link of childPRLinks) {
-                                        const pr = await fetch(`https://dev.azure.com/${org}/${project}/_apis/git/pullrequests/${link.id}?api-version=7.0`, {
-                                            headers
-                                        }).then(r => r.json());
-
-                                        const prLine = isMarkdown
-                                            ? `* PR !${link.id} → \`${pr.repository.name}\` → \`${pr.targetRefName.replace('refs/heads/', '')}\`${isShort ? '' : `\n  * ${pr.title}`}\n`
-                                            : `        PR !${link.id} → ${pr.repository.name} → ${pr.targetRefName.replace('refs/heads/', '')}${isShort ? '' : ` -> ${pr.title}`}\n`;
-                                        
-                                        childOutput += prLine;
-                                    }
-                                }
+                            if (!repositoryPRs[pr.repository.name]) {
+                                repositoryPRs[pr.repository.name] = {
+                                    targetBranches: {},
+                                    prs: []
+                                };
                             }
+                            
+                            const targetBranch = pr.targetRefName.replace('refs/heads/', '');
+                            if (!repositoryPRs[pr.repository.name].targetBranches[targetBranch]) {
+                                repositoryPRs[pr.repository.name].targetBranches[targetBranch] = [];
+                            }
+                            
+                            repositoryPRs[pr.repository.name].targetBranches[targetBranch].push({
+                                pr: pr,
+                                workItemId: childId,
+                                workItemType: childWorkItem.fields['System.WorkItemType'],
+                                workItemTitle: childWorkItem.fields['System.Title'],
+                                isChild: true,
+                                parentId: item.id
+                            });
+                        }
+                    }
+                }
 
-                            if (hasChildPRs) {
-                                resultElement.textContent += childOutput;
+                // Display PRs grouped by repository
+                if (Object.keys(repositoryPRs).length === 0) {
+                    resultElement.textContent += isMarkdown 
+                        ? "\n> No pull requests found for work items with this tag.\n" 
+                        : "\nNo pull requests found for work items with this tag.\n";
+                } else {
+                    // Sort repositories alphabetically
+                    const sortedRepos = Object.keys(repositoryPRs)
+                        .filter(repoName => !repoFilter || repoName.toLowerCase().includes(repoFilter))
+                        .sort();
+                    
+                    if (sortedRepos.length === 0) {
+                        resultElement.textContent += isMarkdown 
+                            ? "\n> No repositories match the filter criteria.\n" 
+                            : "\nNo repositories match the filter criteria.\n";
+                    }
+                    
+                    for (const repoName of sortedRepos) {
+                        const repoData = repositoryPRs[repoName];
+                        
+                        // Add repository header
+                        resultElement.textContent += isMarkdown
+                            ? `\n## Repository: \`${repoName}\`\n\n`
+                            : `\nRepository: ${repoName}\n${'-'.repeat(repoName.length + 12)}\n`;
+                        
+                        // Sort branches alphabetically
+                        const sortedBranches = Object.keys(repoData.targetBranches).sort();
+                        
+                        for (const branchName of sortedBranches) {
+                            const branchPRs = repoData.targetBranches[branchName];
+                            
+                            // Add branch header
+                            resultElement.textContent += isMarkdown
+                                ? `### Target Branch: \`${branchName}\`\n\n`
+                                : `\n  Target Branch: ${branchName}\n`;
+                            
+                            // Sort PRs by completion/merge date (newest first), then by creation date for non-completed PRs
+                            branchPRs.sort((a, b) => {
+                                // If both PRs are completed, sort by completion date
+                                if (a.pr.status === 'completed' && b.pr.status === 'completed') {
+                                    return new Date(b.pr.closedDate) - new Date(a.pr.closedDate);
+                                }
+                                // If only a is completed, it comes first
+                                if (a.pr.status === 'completed') return -1;
+                                // If only b is completed, it comes first
+                                if (b.pr.status === 'completed') return 1;
+                                // Otherwise sort by creation date
+                                return new Date(b.pr.creationDate) - new Date(a.pr.creationDate);
+                            });
+                            
+                            for (const prData of branchPRs) {
+                                // Format work item info
+                                let workItemText;
+                                
+                                // Create work item links only when not in short mode
+                                const workItemLink = isMarkdown && !isShort ? 
+                                    `https://dev.azure.com/${org}/${project}/_workitems/edit/${prData.workItemId}` : '';
+                                const parentLink = isMarkdown && !isShort && prData.isChild ? 
+                                    `https://dev.azure.com/${org}/${project}/_workitems/edit/${prData.parentId}` : '';
+                                
+                                if (prData.isChild) {
+                                    workItemText = isMarkdown
+                                        ? (isShort
+                                            ? `#${prData.workItemId} (child of #${prData.parentId})`
+                                            : `[#${prData.workItemId}](${workItemLink}) (${prData.workItemType}) (child of [#${prData.parentId}](${parentLink})): ${prData.workItemTitle}`)
+                                        : (isShort
+                                            ? `#${prData.workItemId} (child of #${prData.parentId})`
+                                            : `#${prData.workItemId} (${prData.workItemType}) (child of #${prData.parentId}): ${prData.workItemTitle}`);
+                                } else {
+                                    workItemText = isMarkdown
+                                        ? (isShort
+                                            ? `#${prData.workItemId}`
+                                            : `[#${prData.workItemId}](${workItemLink}) (${prData.workItemType}): ${prData.workItemTitle}`)
+                                        : (isShort
+                                            ? `#${prData.workItemId}`
+                                            : `#${prData.workItemId} (${prData.workItemType}): ${prData.workItemTitle}`);
+                                }
+                                
+                                // Add PR line with link to PR (only when not in short mode)
+                                const prLink = isMarkdown && !isShort ? 
+                                    `https://dev.azure.com/${org}/${project}/_git/${prData.pr.repository.name}/pullrequest/${prData.pr.pullRequestId}` : '';
+                                
+                                const prLine = isMarkdown
+                                    ? (isShort
+                                        ? `* PR !${prData.pr.pullRequestId} - ${workItemText}\n`
+                                        : `* PR [!${prData.pr.pullRequestId}](${prLink}) - ${workItemText}${isShort ? '' : `\n  * ${prData.pr.title}`}\n`)
+                                    : `    PR !${prData.pr.pullRequestId} - ${workItemText}${isShort ? '' : ` -> ${prData.pr.title}`}\n`;
+                                
+                                resultElement.textContent += prLine;
                             }
                         }
                     }
