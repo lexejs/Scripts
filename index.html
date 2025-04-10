@@ -439,7 +439,7 @@
                 } else {
                     // Sort repositories alphabetically
                     const sortedRepos = Object.keys(repositoryPRs)
-                        .filter(repoName => !repoFilter || repoName.toLowerCase().includes(repoFilter))
+                        .filter(repoName => !repoFilter || repoName.toLowerCase().includes(repoFilter.toLowerCase()))
                         .sort();
                     
                     if (sortedRepos.length === 0) {
