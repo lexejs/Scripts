@@ -529,30 +529,20 @@
                                 // Format work item info
                                 let workItemText;
 
-                                // Create work item links only when not in short mode
-                                const workItemLink = !isShort ?
-                                    `https://dev.azure.com/${org}/${project}/_workitems/edit/${prData.workItemId}` : '';
-                                const parentLink = !isShort && prData.isChild ?
-                                    `https://dev.azure.com/${org}/${project}/_workitems/edit/${prData.parentId}` : '';
-
                                 if (prData.isChild) {
                                     workItemText =
                                         (isShort
                                             ? `#${prData.workItemId} (child of #${prData.parentId})`
-                                            : `[#${prData.workItemId}](${workItemLink}) (${prData.workItemType}) (child of [#${prData.parentId}](${parentLink})): ${prData.workItemTitle}`);
+                                            : `#${prData.workItemId} (${prData.workItemType.replace('Product Backlog Item', 'PBI')}) (child of #${prData.parentId}): ${prData.workItemTitle}`);
                                 } else {
                                     workItemText = (isShort
                                         ? `#${prData.workItemId}`
-                                        : `[#${prData.workItemId}](${workItemLink}) (${prData.workItemType}): ${prData.workItemTitle}`);
+                                        : `#${prData.workItemId} (${prData.workItemType.replace('Product Backlog Item', 'PBI')}): ${prData.workItemTitle}`);
                                 }
-
-                                // Add PR line with link to PR (only when not in short mode)
-                                const prLink = !isShort ?
-                                    `https://dev.azure.com/${org}/${project}/_git/${prData.pr.repository.name}/pullrequest/${prData.pr.pullRequestId}` : '';
 
                                 const prLine = (isShort
                                     ? `* PR !${prData.pr.pullRequestId} - ${workItemText}\n`
-                                    : `* PR [!${prData.pr.pullRequestId}](${prLink}) - ${workItemText}${isShort ? '' : `\n  * ${prData.pr.title}`}\n`);
+                                    : `* PR !${prData.pr.pullRequestId} ${prData.pr.title}\n - ${workItemText}\n\n`);
 
                                 resultElement.textContent += prLine;
                             }
