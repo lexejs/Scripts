@@ -1,62 +1,132 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="UTF-8">
     <title>Azure DevOps PR Tracker</title>
     <style>
-        body { font-family: Arial; max-width: 1200px; margin: 20px auto; padding: 0 20px; }
-        .form { margin-bottom: 20px; }
-        input, button { margin: 5px; padding: 5px; }
-        .error { color: red; }
-        pre { white-space: pre-wrap; }
-        .markdown { background: #f5f5f5; padding: 20px; border-radius: 5px; }
-        .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3;
-                  border-top: 3px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .loading { color: #666; margin-left: 10px; }
-        .form-group { margin: 10px 0; }
-        .form-group label { display: inline-block; width: 120px; }
-        .copy-button { margin-left: 10px; padding: 5px 10px; cursor: pointer; }
-        .output-container { position: relative; }
-        .form-row { 
-            display: flex; 
-            align-items: center; 
-            gap: 20px; 
-            margin: 10px 0; 
+        body {
+            font-family: Arial;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 20px;
         }
-        .form-group { 
-            flex: 1; 
-            margin: 0; 
+
+        .form {
+            margin-bottom: 20px;
+        }
+
+        input,
+        button {
+            margin: 5px;
+            padding: 5px;
+        }
+
+        .error {
+            color: red;
+        }
+
+        pre {
+            white-space: pre-wrap;
+        }
+
+        .markdown {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 5px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading {
+            color: #666;
+            margin-left: 10px;
+        }
+
+        .form-group {
+            margin: 10px 0;
+        }
+
+        .form-group label {
+            display: inline-block;
+            width: 120px;
+        }
+
+        .copy-button {
+            margin-left: 10px;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+
+        .output-container {
+            position: relative;
+        }
+
+        .form-row {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin: 10px 0;
+        }
+
+        .form-group {
+            flex: 1;
+            margin: 0;
             min-width: 200px;
         }
-        .form-group label { 
-            display: block; 
-            margin-bottom: 3px; 
-            font-size: 0.9em; 
-            color: #666; 
+
+        .form-group label {
+            display: block;
+            margin-bottom: 3px;
+            font-size: 0.9em;
+            color: #666;
         }
+
         .form-group input[type="text"],
-        .form-group input[type="password"] { 
-            width: 100%; 
+        .form-group input[type="password"] {
+            width: 100%;
             box-sizing: border-box;
         }
+
         .options-group {
             margin: 10px 0;
         }
+
         .collapsible {
             background: #f5f5f5;
             padding: 10px;
             border-radius: 5px;
             margin-bottom: 10px;
         }
+
         .collapsible-header {
             cursor: pointer;
             user-select: none;
             display: flex;
             align-items: center;
         }
+
         .collapsible-header:before {
-            content: '\25BC';  /* Unicode символ для треугольника вниз */
+            content: '\25BC';
+            /* Unicode символ для треугольника вниз */
             margin-right: 8px;
             display: inline-block;
             transition: transform 0.2s;
@@ -66,9 +136,11 @@
             line-height: 12px;
             text-align: center;
         }
+
         .collapsible.collapsed .collapsible-header:before {
             transform: rotate(-90deg);
         }
+
         .collapsible.collapsed .collapsible-content {
             visibility: hidden;
             height: 0;
@@ -76,16 +148,19 @@
             padding: 0;
             margin: 0;
         }
+
         .collapsible .collapsible-content {
             visibility: visible;
             height: auto;
             transition: visibility 0s, height 0.2s ease-out;
         }
+
         .invalid {
             border-color: red !important;
         }
     </style>
 </head>
+
 <body>
     <form id="azureForm" autocomplete="on">
         <div class="collapsible collapsed">
@@ -94,30 +169,17 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="org">Organization:</label>
-                        <input type="text" 
-                               id="org" 
-                               name="org" 
-                               value="dtstac" 
-                               required
-                               autocomplete="username">
+                        <input type="text" id="org" name="org" value="dtstac" required autocomplete="username">
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="project">Project:</label>
-                        <input type="text" 
-                               id="project" 
-                               name="project" 
-                               value="K1DE"
-                               required>
+                        <input type="text" id="project" name="project" value="K1DE" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="pat">Access Token:</label>
-                        <input type="password" 
-                               id="pat" 
-                               name="pat" 
-                               required
-                               autocomplete="current-password">
+                        <input type="password" id="pat" name="pat" required autocomplete="current-password">
                     </div>
                 </div>
             </div>
@@ -126,24 +188,16 @@
         <div class="form-row">
             <div class="form-group">
                 <label for="tag">Tag:</label>
-                <input type="text" 
-                       id="tag" 
-                       name="tag" 
-                       value="AddToUat"
-                       required>
+                <input type="text" id="tag" name="tag" value="AddToUat" required>
             </div>
 
             <div class="form-group">
                 <label for="repoFilter">Repository Filter:</label>
-                <input type="text" 
-                       id="repoFilter" 
-                       name="repoFilter" 
-                       placeholder="Optional filter">
+                <input type="text" id="repoFilter" name="repoFilter" placeholder="Optional filter">
             </div>
 
             <div class="options-group">
                 <label><input type="checkbox" id="shortOutput" name="shortOutput"> Short output</label>
-                <label><input type="checkbox" id="markdownOutput" name="markdownOutput"> Markdown</label>
             </div>
 
             <div>
@@ -162,7 +216,7 @@
     </div>
 
     <script>
-        window.onload = function() {
+        window.onload = function () {
             // Load saved parameters from localStorage
             const savedParams = {
                 org: localStorage.getItem('azure_org'),
@@ -173,33 +227,32 @@
                 shortOutput: localStorage.getItem('azure_shortOutput') === 'true',
                 markdownOutput: localStorage.getItem('azure_markdownOutput') === 'true'
             };
-            
+
             // Apply saved values to form
             if (savedParams.org) document.getElementById('org').value = savedParams.org;
             if (savedParams.project) document.getElementById('project').value = savedParams.project;
             if (savedParams.tag) document.getElementById('tag').value = savedParams.tag;
             if (savedParams.repoFilter) document.getElementById('repoFilter').value = savedParams.repoFilter;
             if (savedParams.pat) document.getElementById('pat').value = savedParams.pat;
-            
+
             // Set checkboxes
             document.getElementById('shortOutput').checked = savedParams.shortOutput;
-            document.getElementById('markdownOutput').checked = savedParams.markdownOutput;
-            
+
             // Check if all required fields in collapsible section are filled
             const collapsible = document.querySelector('.collapsible');
             const requiredFields = collapsible.querySelectorAll('input[required]');
             const allFieldsFilled = Array.from(requiredFields).every(input => input.value.trim());
-            
+
             // Expand section if any required field is empty
             if (!allFieldsFilled) {
                 collapsible.classList.remove('collapsed');
             }
 
             // Add collapsible functionality
-            document.querySelector('.collapsible-header').addEventListener('click', function() {
+            document.querySelector('.collapsible-header').addEventListener('click', function () {
                 const collapsible = this.parentElement;
                 const requiredFields = collapsible.querySelectorAll('input[required]');
-                const hasInvalidFields = Array.from(requiredFields).some(input => 
+                const hasInvalidFields = Array.from(requiredFields).some(input =>
                     input.classList.contains('invalid') || !input.value.trim()
                 );
 
@@ -214,9 +267,9 @@
         }
 
         // Form validation
-        document.getElementById('azureForm').addEventListener('submit', async function(e) {
+        document.getElementById('azureForm').addEventListener('submit', async function (e) {
             e.preventDefault();
-            
+
             // Reset validation
             this.querySelectorAll('input[required]').forEach(input => {
                 input.classList.remove('invalid');
@@ -244,13 +297,13 @@
             // If form is valid, collapse the section before sending
             const collapsible = document.querySelector('.collapsible');
             collapsible.classList.add('collapsed');
-            
+
             await getWorkItems();
         });
 
         // Add input validation on change
         document.querySelectorAll('input[required]').forEach(input => {
-            input.addEventListener('input', function() {
+            input.addEventListener('input', function () {
                 if (this.value.trim()) {
                     this.classList.remove('invalid');
                 } else {
@@ -266,8 +319,7 @@
             const pat = document.getElementById('pat').value;
             const repoFilter = document.getElementById('repoFilter').value.trim();
             const isShort = document.getElementById('shortOutput').checked;
-            const isMarkdown = document.getElementById('markdownOutput').checked;
-            
+
             // Save all parameters to localStorage
             localStorage.setItem('azure_org', org);
             localStorage.setItem('azure_project', project);
@@ -275,7 +327,7 @@
             localStorage.setItem('azure_repoFilter', repoFilter);
             localStorage.setItem('azure_pat', pat);
             localStorage.setItem('azure_shortOutput', isShort);
-            localStorage.setItem('azure_markdownOutput', isMarkdown);
+
 
             const output = document.getElementById('output');
             const loading = document.getElementById('loading');
@@ -290,11 +342,11 @@
                 loading.style.display = 'inline-block';
                 fetchButton.disabled = true;
                 document.getElementById('copyButton').style.display = 'none';
-                output.innerHTML = `<pre class="${isMarkdown ? 'markdown' : ''}"></pre>`;
+                output.innerHTML = `<pre class="markdown"></pre>`;
                 const resultElement = output.querySelector('pre');
-                
+
                 // Initial header
-                resultElement.textContent = isMarkdown ? `## Work items with tag: ${tag}\n\n` : '';
+                resultElement.textContent = `## Work items with tag: ${tag}\n\n`;
 
                 // Get work items by tag
                 const wiqlQuery = {
@@ -315,23 +367,23 @@
                 const repositoryPRs = {};
                 // Track PR IDs to avoid duplicates
                 const processedPRs = new Set();
-                
+
                 // Helper function to add PR to repository structure
                 const addPrToRepository = (pr, workItemId, workItemType, workItemTitle, isChild = false, parentId = null) => {
                     if (pr.status !== 'completed') return; // Skip PRs that are not completed
-                    
+
                     if (!repositoryPRs[pr.repository.name]) {
                         repositoryPRs[pr.repository.name] = {
                             targetBranches: {},
                             prs: []
                         };
                     }
-                    
+
                     const targetBranch = pr.targetRefName.replace('refs/heads/', '');
                     if (!repositoryPRs[pr.repository.name].targetBranches[targetBranch]) {
                         repositoryPRs[pr.repository.name].targetBranches[targetBranch] = [];
                     }
-                    
+
                     repositoryPRs[pr.repository.name].targetBranches[targetBranch].push({
                         pr: pr,
                         workItemId,
@@ -346,7 +398,7 @@
                 await Promise.all(workItems.workItems.map(async (item) => {
                     // Fetch work item details
                     const workItem = await fetch(
-                        `https://dev.azure.com/${org}/${project}/_apis/wit/workitems/${item.id}?$expand=relations&api-version=7.0`, 
+                        `https://dev.azure.com/${org}/${project}/_apis/wit/workitems/${item.id}?$expand=relations&api-version=7.0`,
                         { headers }
                     ).then(r => r.json());
 
@@ -367,20 +419,20 @@
                     // Process PR links in parallel
                     const prPromises = prLinks.map(async (link) => {
                         const prKey = `${link.repository_id}/${link.id}`;
-                        
+
                         // Skip if already processed
                         if (processedPRs.has(prKey)) return;
                         processedPRs.add(prKey);
-                        
+
                         const pr = await fetch(
-                            `https://dev.azure.com/${org}/${project}/_apis/git/pullrequests/${link.id}?api-version=7.0`, 
+                            `https://dev.azure.com/${org}/${project}/_apis/git/pullrequests/${link.id}?api-version=7.0`,
                             { headers }
                         ).then(r => r.json());
-                        
+
                         addPrToRepository(
-                            pr, 
-                            item.id, 
-                            workItem.fields['System.WorkItemType'], 
+                            pr,
+                            item.id,
+                            workItem.fields['System.WorkItemType'],
                             workItem.fields['System.Title']
                         );
                     });
@@ -388,7 +440,7 @@
                     // Process children in parallel
                     const childPromises = childIds.map(async (childId) => {
                         const childWorkItem = await fetch(
-                            `https://dev.azure.com/${org}/${project}/_apis/wit/workitems/${childId}?$expand=relations&api-version=7.0`, 
+                            `https://dev.azure.com/${org}/${project}/_apis/wit/workitems/${childId}?$expand=relations&api-version=7.0`,
                             { headers }
                         ).then(r => r.json());
 
@@ -403,22 +455,22 @@
                         // Process child's PRs in parallel
                         const childPrPromises = childPRLinks.map(async (link) => {
                             const prKey = `${link.repository_id}/${link.id}`;
-                            
+
                             // Skip if already processed
                             if (processedPRs.has(prKey)) return;
                             processedPRs.add(prKey);
-                            
+
                             const pr = await fetch(
-                                `https://dev.azure.com/${org}/${project}/_apis/git/pullrequests/${link.id}?api-version=7.0`, 
+                                `https://dev.azure.com/${org}/${project}/_apis/git/pullrequests/${link.id}?api-version=7.0`,
                                 { headers }
                             ).then(r => r.json());
-                            
+
                             addPrToRepository(
-                                pr, 
-                                childId, 
-                                childWorkItem.fields['System.WorkItemType'], 
-                                childWorkItem.fields['System.Title'], 
-                                true, 
+                                pr,
+                                childId,
+                                childWorkItem.fields['System.WorkItemType'],
+                                childWorkItem.fields['System.Title'],
+                                true,
                                 item.id
                             );
                         });
@@ -433,40 +485,32 @@
 
                 // Display PRs grouped by repository
                 if (Object.keys(repositoryPRs).length === 0) {
-                    resultElement.textContent += isMarkdown 
-                        ? "\n> No pull requests found for work items with this tag.\n" 
-                        : "\nNo pull requests found for work items with this tag.\n";
+                    resultElement.textContent += "\n> No pull requests found for work items with this tag.\n";
                 } else {
                     // Sort repositories alphabetically
                     const sortedRepos = Object.keys(repositoryPRs)
                         .filter(repoName => !repoFilter || repoName.toLowerCase().includes(repoFilter.toLowerCase()))
                         .sort();
-                    
+
                     if (sortedRepos.length === 0) {
-                        resultElement.textContent += isMarkdown 
-                            ? "\n> No repositories match the filter criteria.\n" 
-                            : "\nNo repositories match the filter criteria.\n";
+                        resultElement.textContent += "\n> No repositories match the filter criteria.\n";
                     }
-                    
+
                     for (const repoName of sortedRepos) {
                         const repoData = repositoryPRs[repoName];
-                        
+
                         // Add repository header
-                        resultElement.textContent += isMarkdown
-                            ? `\n## Repository: \`${repoName}\`\n\n`
-                            : `\nRepository: ${repoName}\n${'-'.repeat(repoName.length + 12)}\n`;
-                        
+                        resultElement.textContent += `\n## Repository: \`${repoName}\`\n\n`;
+
                         // Sort branches alphabetically
                         const sortedBranches = Object.keys(repoData.targetBranches).sort();
-                        
+
                         for (const branchName of sortedBranches) {
                             const branchPRs = repoData.targetBranches[branchName];
-                            
+
                             // Add branch header
-                            resultElement.textContent += isMarkdown
-                                ? `### Target Branch: \`${branchName}\`\n\n`
-                                : `\n  Target Branch: ${branchName}\n`;
-                            
+                            resultElement.textContent += `### Target Branch: \`${branchName}\`\n\n`;
+
                             // Sort PRs by completion/merge date (newest first), then by creation date for non-completed PRs
                             branchPRs.sort((a, b) => {
                                 // If both PRs are completed, sort by completion date
@@ -480,45 +524,36 @@
                                 // Otherwise sort by creation date
                                 return new Date(b.pr.creationDate) - new Date(a.pr.creationDate);
                             });
-                            
+
                             for (const prData of branchPRs) {
                                 // Format work item info
                                 let workItemText;
-                                
+
                                 // Create work item links only when not in short mode
-                                const workItemLink = isMarkdown && !isShort ? 
+                                const workItemLink = !isShort ?
                                     `https://dev.azure.com/${org}/${project}/_workitems/edit/${prData.workItemId}` : '';
-                                const parentLink = isMarkdown && !isShort && prData.isChild ? 
+                                const parentLink = !isShort && prData.isChild ?
                                     `https://dev.azure.com/${org}/${project}/_workitems/edit/${prData.parentId}` : '';
-                                
+
                                 if (prData.isChild) {
-                                    workItemText = isMarkdown
-                                        ? (isShort
+                                    workItemText =
+                                        (isShort
                                             ? `#${prData.workItemId} (child of #${prData.parentId})`
-                                            : `[#${prData.workItemId}](${workItemLink}) (${prData.workItemType}) (child of [#${prData.parentId}](${parentLink})): ${prData.workItemTitle}`)
-                                        : (isShort
-                                            ? `#${prData.workItemId} (child of #${prData.parentId})`
-                                            : `#${prData.workItemId} (${prData.workItemType}) (child of #${prData.parentId}): ${prData.workItemTitle}`);
+                                            : `[#${prData.workItemId}](${workItemLink}) (${prData.workItemType}) (child of [#${prData.parentId}](${parentLink})): ${prData.workItemTitle}`);
                                 } else {
-                                    workItemText = isMarkdown
-                                        ? (isShort
-                                            ? `#${prData.workItemId}`
-                                            : `[#${prData.workItemId}](${workItemLink}) (${prData.workItemType}): ${prData.workItemTitle}`)
-                                        : (isShort
-                                            ? `#${prData.workItemId}`
-                                            : `#${prData.workItemId} (${prData.workItemType}): ${prData.workItemTitle}`);
+                                    workItemText = (isShort
+                                        ? `#${prData.workItemId}`
+                                        : `[#${prData.workItemId}](${workItemLink}) (${prData.workItemType}): ${prData.workItemTitle}`);
                                 }
-                                
+
                                 // Add PR line with link to PR (only when not in short mode)
-                                const prLink = isMarkdown && !isShort ? 
+                                const prLink = !isShort ?
                                     `https://dev.azure.com/${org}/${project}/_git/${prData.pr.repository.name}/pullrequest/${prData.pr.pullRequestId}` : '';
-                                
-                                const prLine = isMarkdown
-                                    ? (isShort
-                                        ? `* PR !${prData.pr.pullRequestId} - ${workItemText}\n`
-                                        : `* PR [!${prData.pr.pullRequestId}](${prLink}) - ${workItemText}${isShort ? '' : `\n  * ${prData.pr.title}`}\n`)
-                                    : `    PR !${prData.pr.pullRequestId} - ${workItemText}${isShort ? '' : ` -> ${prData.pr.title}`}\n`;
-                                
+
+                                const prLine = (isShort
+                                    ? `* PR !${prData.pr.pullRequestId} - ${workItemText}\n`
+                                    : `* PR [!${prData.pr.pullRequestId}](${prLink}) - ${workItemText}${isShort ? '' : `\n  * ${prData.pr.title}`}\n`);
+
                                 resultElement.textContent += prLine;
                             }
                         }
@@ -537,7 +572,7 @@
         }
 
         // Add copy button handler
-        document.getElementById('copyButton').addEventListener('click', function() {
+        document.getElementById('copyButton').addEventListener('click', function () {
             const output = document.querySelector('#output pre');
             if (output) {
                 navigator.clipboard.writeText(output.textContent)
@@ -547,4 +582,5 @@
         });
     </script>
 </body>
-</html> 
+
+</html>
