@@ -316,13 +316,41 @@
                 // Track PR IDs to avoid duplicates
                 const processedPRs = new Set();
                 
-                // Process each work item and collect all PRs
-                for (const item of workItems.workItems) {
-                    const workItem = await fetch(`https://dev.azure.com/${org}/${project}/_apis/wit/workitems/${item.id}?$expand=relations&api-version=7.0`, {
-                        headers
-                    }).then(r => r.json());
+                // Helper function to add PR to repository structure
+                const addPrToRepository = (pr, workItemId, workItemType, workItemTitle, isChild = false, parentId = null) => {
+                    if (pr.status !== 'completed') return; // Skip PRs that are not completed
+                    
+                    if (!repositoryPRs[pr.repository.name]) {
+                        repositoryPRs[pr.repository.name] = {
+                            targetBranches: {},
+                            prs: []
+                        };
+                    }
+                    
+                    const targetBranch = pr.targetRefName.replace('refs/heads/', '');
+                    if (!repositoryPRs[pr.repository.name].targetBranches[targetBranch]) {
+                        repositoryPRs[pr.repository.name].targetBranches[targetBranch] = [];
+                    }
+                    
+                    repositoryPRs[pr.repository.name].targetBranches[targetBranch].push({
+                        pr: pr,
+                        workItemId,
+                        workItemType,
+                        workItemTitle,
+                        isChild,
+                        parentId
+                    });
+                };
 
-                    // Get PR links for main work item
+                // Process all work items in parallel
+                await Promise.all(workItems.workItems.map(async (item) => {
+                    // Fetch work item details
+                    const workItem = await fetch(
+                        `https://dev.azure.com/${org}/${project}/_apis/wit/workitems/${item.id}?$expand=relations&api-version=7.0`, 
+                        { headers }
+                    ).then(r => r.json());
+
+                    // Extract PR links from work item
                     const prLinks = workItem.relations
                         ?.filter(rel => rel.rel === 'ArtifactLink' && rel.attributes.name === 'Pull Request')
                         .map(rel => ({
@@ -331,49 +359,38 @@
                         }))
                         .sort((a, b) => parseInt(a.id) - parseInt(b.id)) || [];
 
-                    // Process PRs for main work item
-                    for (const link of prLinks) {
-                        // Create a unique key for this PR
-                        const prKey = `${link.repository_id}/${link.id}`;
-                        
-                        // Skip if we've already processed this PR
-                        if (processedPRs.has(prKey)) continue;
-                        processedPRs.add(prKey);
-                        
-                        const pr = await fetch(`https://dev.azure.com/${org}/${project}/_apis/git/pullrequests/${link.id}?api-version=7.0`, {
-                            headers
-                        }).then(r => r.json());
-                        
-                        if (!repositoryPRs[pr.repository.name]) {
-                            repositoryPRs[pr.repository.name] = {
-                                targetBranches: {},
-                                prs: []
-                            };
-                        }
-                        
-                        const targetBranch = pr.targetRefName.replace('refs/heads/', '');
-                        if (!repositoryPRs[pr.repository.name].targetBranches[targetBranch]) {
-                            repositoryPRs[pr.repository.name].targetBranches[targetBranch] = [];
-                        }
-                        
-                        repositoryPRs[pr.repository.name].targetBranches[targetBranch].push({
-                            pr: pr,
-                            workItemId: item.id,
-                            workItemType: workItem.fields['System.WorkItemType'],
-                            workItemTitle: workItem.fields['System.Title'],
-                            isChild: false
-                        });
-                    }
-
-                    // Get child work items and their PRs
+                    // Extract child links from work item
                     const childIds = workItem.relations
                         ?.filter(rel => rel.rel === 'System.LinkTypes.Hierarchy-Forward')
                         .map(rel => rel.url.split('/').pop()) || [];
 
-                    for (const childId of childIds) {
-                        const childWorkItem = await fetch(`https://dev.azure.com/${org}/${project}/_apis/wit/workitems/${childId}?$expand=relations&api-version=7.0`, {
-                            headers
-                        }).then(r => r.json());
+                    // Process PR links in parallel
+                    const prPromises = prLinks.map(async (link) => {
+                        const prKey = `${link.repository_id}/${link.id}`;
+                        
+                        // Skip if already processed
+                        if (processedPRs.has(prKey)) return;
+                        processedPRs.add(prKey);
+                        
+                        const pr = await fetch(
+                            `https://dev.azure.com/${org}/${project}/_apis/git/pullrequests/${link.id}?api-version=7.0`, 
+                            { headers }
+                        ).then(r => r.json());
+                        
+                        addPrToRepository(
+                            pr, 
+                            item.id, 
+                            workItem.fields['System.WorkItemType'], 
+                            workItem.fields['System.Title']
+                        );
+                    });
+
+                    // Process children in parallel
+                    const childPromises = childIds.map(async (childId) => {
+                        const childWorkItem = await fetch(
+                            `https://dev.azure.com/${org}/${project}/_apis/wit/workitems/${childId}?$expand=relations&api-version=7.0`, 
+                            { headers }
+                        ).then(r => r.json());
 
                         const childPRLinks = childWorkItem.relations
                             ?.filter(rel => rel.rel === 'ArtifactLink' && rel.attributes.name === 'Pull Request')
@@ -383,42 +400,36 @@
                             }))
                             .sort((a, b) => parseInt(a.id) - parseInt(b.id)) || [];
 
-                        // Process PRs for child work items
-                        for (const link of childPRLinks) {
-                            // Create a unique key for this PR
+                        // Process child's PRs in parallel
+                        const childPrPromises = childPRLinks.map(async (link) => {
                             const prKey = `${link.repository_id}/${link.id}`;
                             
-                            // Skip if we've already processed this PR
-                            if (processedPRs.has(prKey)) continue;
+                            // Skip if already processed
+                            if (processedPRs.has(prKey)) return;
                             processedPRs.add(prKey);
                             
-                            const pr = await fetch(`https://dev.azure.com/${org}/${project}/_apis/git/pullrequests/${link.id}?api-version=7.0`, {
-                                headers
-                            }).then(r => r.json());
+                            const pr = await fetch(
+                                `https://dev.azure.com/${org}/${project}/_apis/git/pullrequests/${link.id}?api-version=7.0`, 
+                                { headers }
+                            ).then(r => r.json());
                             
-                            if (!repositoryPRs[pr.repository.name]) {
-                                repositoryPRs[pr.repository.name] = {
-                                    targetBranches: {},
-                                    prs: []
-                                };
-                            }
-                            
-                            const targetBranch = pr.targetRefName.replace('refs/heads/', '');
-                            if (!repositoryPRs[pr.repository.name].targetBranches[targetBranch]) {
-                                repositoryPRs[pr.repository.name].targetBranches[targetBranch] = [];
-                            }
-                            
-                            repositoryPRs[pr.repository.name].targetBranches[targetBranch].push({
-                                pr: pr,
-                                workItemId: childId,
-                                workItemType: childWorkItem.fields['System.WorkItemType'],
-                                workItemTitle: childWorkItem.fields['System.Title'],
-                                isChild: true,
-                                parentId: item.id
-                            });
-                        }
-                    }
-                }
+                            addPrToRepository(
+                                pr, 
+                                childId, 
+                                childWorkItem.fields['System.WorkItemType'], 
+                                childWorkItem.fields['System.Title'], 
+                                true, 
+                                item.id
+                            );
+                        });
+
+                        // Wait for all child's PRs to be processed
+                        await Promise.all(childPrPromises);
+                    });
+
+                    // Wait for all PRs and children to be processed
+                    await Promise.all([...prPromises, ...childPromises]);
+                }));
 
                 // Display PRs grouped by repository
                 if (Object.keys(repositoryPRs).length === 0) {
