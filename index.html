@@ -196,6 +196,11 @@
                 <input type="text" id="repoFilter" name="repoFilter" placeholder="Optional filter">
             </div>
 
+            <div class="form-group">
+                <label for="verifyBranch">Verify Branch:</label>
+                <input type="text" id="verifyBranch" name="verifyBranch" placeholder="Branch to verify PRs">
+            </div>
+
             <div class="options-group">
                 <label><input type="checkbox" id="shortOutput" name="shortOutput"> Short output</label>
             </div>
@@ -223,6 +228,7 @@
                 project: localStorage.getItem('azure_project'),
                 tag: localStorage.getItem('azure_tag'),
                 repoFilter: localStorage.getItem('azure_repoFilter'),
+                verifyBranch: localStorage.getItem('azure_verifyBranch'),
                 pat: localStorage.getItem('azure_pat'),
                 shortOutput: localStorage.getItem('azure_shortOutput') === 'true',
                 markdownOutput: localStorage.getItem('azure_markdownOutput') === 'true'
@@ -233,6 +239,7 @@
             if (savedParams.project) document.getElementById('project').value = savedParams.project;
             if (savedParams.tag) document.getElementById('tag').value = savedParams.tag;
             if (savedParams.repoFilter) document.getElementById('repoFilter').value = savedParams.repoFilter;
+            if (savedParams.verifyBranch) document.getElementById('verifyBranch').value = savedParams.verifyBranch;
             if (savedParams.pat) document.getElementById('pat').value = savedParams.pat;
 
             // Set checkboxes
@@ -318,6 +325,7 @@
             const tag = document.getElementById('tag').value;
             const pat = document.getElementById('pat').value;
             const repoFilter = document.getElementById('repoFilter').value.trim();
+            const verifyBranch = document.getElementById('verifyBranch').value.trim();
             const isShort = document.getElementById('shortOutput').checked;
 
             // Save all parameters to localStorage
@@ -325,6 +333,7 @@
             localStorage.setItem('azure_project', project);
             localStorage.setItem('azure_tag', tag);
             localStorage.setItem('azure_repoFilter', repoFilter);
+            localStorage.setItem('azure_verifyBranch', verifyBranch);
             localStorage.setItem('azure_pat', pat);
             localStorage.setItem('azure_shortOutput', isShort);
 
@@ -390,7 +399,9 @@
                         workItemType,
                         workItemTitle,
                         isChild,
-                        parentId
+                        parentId,
+                        verifiedInBranch: false,  // Default value, will be updated later
+                        verifiedByCherryPick: false
                     });
                 };
 
@@ -496,6 +507,164 @@
                         resultElement.textContent += "\n> No repositories match the filter criteria.\n";
                     }
 
+                    // Check PRs against verify branch if specified
+                    if (verifyBranch) {
+                        resultElement.textContent += `\nVerifying PRs in branch: \`${verifyBranch}\`\n\n`;
+                        
+                        // Commit cache to avoid redundant API calls
+                        const commitCache = {
+                            // Structure: {repoId: {branchName: [commits]}}
+                        };
+                        
+                        // Process all repositories in parallel
+                        await Promise.all(sortedRepos.map(async (repoName) => {
+                            const repoData = repositoryPRs[repoName];
+                            
+                            // Get repository ID
+                            const repoInfo = await fetch(
+                                `https://dev.azure.com/${org}/${project}/_apis/git/repositories/${repoName}?api-version=7.0`,
+                                { headers }
+                            ).then(r => r.json());
+                            
+                            // Cache for commit details to reduce API calls
+                            const commitDetailsCache = {};
+                            
+                            // Fetch all branch commits once and cache them
+                            if (!commitCache[repoInfo.id]) {
+                                commitCache[repoInfo.id] = {};
+                            }
+                            
+                            if (!commitCache[repoInfo.id][verifyBranch]) {
+                                // Limit to 200 most recent commits for performance
+                                const branchCommits = await fetch(
+                                    `https://dev.azure.com/${org}/${project}/_apis/git/repositories/${repoInfo.id}/commits?searchCriteria.itemVersion.version=${verifyBranch}&searchCriteria.$top=300&api-version=7.0`,
+                                    { headers }
+                                ).then(r => r.json());
+                                
+                                commitCache[repoInfo.id][verifyBranch] = branchCommits.value || [];
+                            }
+                            
+                            // Flatten all PRs from all branches for parallel processing
+                            const allPRsToVerify = [];
+                            
+                            for (const branchName of Object.keys(repoData.targetBranches)) {
+                                const branchPRs = repoData.targetBranches[branchName];
+                                allPRsToVerify.push(...branchPRs);
+                            }
+                            
+                            // Process all PRs in parallel
+                            await Promise.all(allPRsToVerify.map(async (prData) => {
+                                try {
+                                    // Get PR commits
+                                    const commits = await fetch(
+                                        `https://dev.azure.com/${org}/${project}/_apis/git/repositories/${repoInfo.id}/pullRequests/${prData.pr.pullRequestId}/commits?api-version=7.0`,
+                                        { headers }
+                                    ).then(r => r.json());
+                                    
+                                    if (commits.count > 0) {
+                                        const lastCommit = commits.value[commits.count - 1];
+                                        const branchCommits = commitCache[repoInfo.id][verifyBranch];
+                                        
+                                        // Mark as verified if the commit is found in the branch
+                                        prData.verifiedInBranch = branchCommits.some(commit => 
+                                            commit.commitId === lastCommit.commitId
+                                        );
+
+                                        // If not verified by commit ID, try to verify by commit message (for cherry-picks)
+                                        if (!prData.verifiedInBranch && branchCommits.length > 0) {
+                                            // Get PR number for checking if it's referenced in commit messages
+                                            const prNumber = prData.pr.pullRequestId;
+                                            
+                                            // Extract the core message, keeping work item IDs
+                                            const prCommitMessage = lastCommit.comment
+                                                .replace(/Merged PR \d+:\s*/i, '') // Remove "Merged PR XXXXX:" prefix
+                                                .replace(/\.\.\.$/, '')           // Remove trailing ellipsis
+                                                .trim();
+                                                
+                                            // Process commit comparisons in parallel (up to 10 at a time)
+                                            // Use a batching approach to avoid overwhelming the API
+                                            const batchSize = 10;
+                                            const batches = Math.ceil(branchCommits.length / batchSize);
+                                            
+                                            for (let i = 0; i < batches && !prData.verifiedInBranch; i++) {
+                                                const start = i * batchSize;
+                                                const end = Math.min((i + 1) * batchSize, branchCommits.length);
+                                                const batchCommits = branchCommits.slice(start, end);
+                                                
+                                                // Check each batch of commits in parallel
+                                                const results = await Promise.all(batchCommits.map(async (branchCommit) => {
+                                                    // Extract comment from the commit object if available, 
+                                                    // or fetch details only if necessary
+                                                    let commitComment = branchCommit.comment;
+                                                    
+                                                    // If comment is not available in the commit object, fetch the details
+                                                    if (!commitComment) {
+                                                        let commitDetails;
+                                                        
+                                                        // Use cached commit details if available
+                                                        if (commitDetailsCache[branchCommit.commitId]) {
+                                                            commitDetails = commitDetailsCache[branchCommit.commitId];
+                                                        } else {
+                                                            // Fetch and cache commit details
+                                                            commitDetails = await fetch(
+                                                                `https://dev.azure.com/${org}/${project}/_apis/git/repositories/${repoInfo.id}/commits/${branchCommit.commitId}?api-version=7.0`,
+                                                                { headers }
+                                                            ).then(r => r.json());
+                                                            
+                                                            commitDetailsCache[branchCommit.commitId] = commitDetails;
+                                                        }
+                                                        
+                                                        commitComment = commitDetails.comment;
+                                                    }
+                                                    
+                                                    // Extract the core message from branch commit
+                                                    const branchCommitMessage = commitComment
+                                                        .replace(/Merged PR \d+:\s*/i, '') // Remove "Merged PR XXXXX:" prefix
+                                                        .replace(/\.\.\.$/, '')           // Remove trailing ellipsis
+                                                        .trim();
+                                                    
+                                                    // Check for exact message match (keeping work item IDs)
+                                                    const exactMatch = prCommitMessage && branchCommitMessage && 
+                                                        prCommitMessage === branchCommitMessage;
+                                                        
+                                                    // Check if PR ID is referenced in the commit message
+                                                    const prIdInCommit = commitComment.includes(`PR ${prNumber}`) || 
+                                                                       commitComment.includes(`PR #${prNumber}`) || 
+                                                                       commitComment.includes(`PR!${prNumber}`);
+                                                    
+                                                    return { 
+                                                        exactMatch, 
+                                                        prIdInCommit,
+                                                        branchCommitMessage,
+                                                        prCommitMessage
+                                                    };
+                                                }));
+                                                
+                                                // Check for matches
+                                                for (const result of results) {
+                                                    // If we have an exact match
+                                                    if (result.exactMatch) {
+                                                        prData.verifiedInBranch = true;
+                                                        prData.verifiedByCherryPick = true;
+                                                        break;
+                                                    }
+                                                    // If PR ID is mentioned in commit
+                                                    else if (result.prIdInCommit) {
+                                                        prData.verifiedInBranch = true;
+                                                        prData.verifiedByPrReference = true;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                } catch (error) {
+                                    console.error(`Error verifying PR ${prData.pr.pullRequestId} in branch ${verifyBranch}:`, error);
+                                }
+                            }));
+                        }));
+                    }
+
                     for (const repoName of sortedRepos) {
                         const repoData = repositoryPRs[repoName];
 
@@ -540,9 +709,17 @@
                                         : `#${prData.workItemId} (${prData.workItemType.replace('Product Backlog Item', 'PBI')}): ${prData.workItemTitle}`);
                                 }
 
+                                // Add verification status if branch was specified
+                                const verificationMark = verifyBranch 
+                                    ? (prData.verifiedInBranch 
+                                        ? (prData.verifiedByCherryPick ? ' ✅🍒' : 
+                                           prData.verifiedByPrReference ? ' ✅📝' : ' ✅') 
+                                        : ' ❌') 
+                                    : '';
+
                                 const prLine = (isShort
-                                    ? `* PR !${prData.pr.pullRequestId} - ${workItemText}\n`
-                                    : `* PR !${prData.pr.pullRequestId} ${prData.pr.title}\n - ${workItemText}\n\n`);
+                                    ? `* PR !${prData.pr.pullRequestId}${verificationMark} - ${workItemText}\n`
+                                    : `* PR !${prData.pr.pullRequestId}${verificationMark}: ${prData.pr.title}\n - ${workItemText}\n\n`);
 
                                 resultElement.textContent += prLine;
                             }
