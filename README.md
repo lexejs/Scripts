@@ -2,6 +2,10 @@
 
 A web-based tool to track and verify pull requests in Azure DevOps repositories based on tags and branch verification.
 
+## Live Demo
+
+Visit the [live demo](https://lexejs.github.io/Scripts/) to try the tool.
+
 ## Features
 
 - **Tag-based PR Tracking**: Find all pull requests associated with work items tagged with a specific tag
@@ -60,6 +64,18 @@ A web-based tool to track and verify pull requests in Azure DevOps repositories 
 - Branch verification is limited to the 300 most recent commits
 - Cherry-pick detection relies on commit message matching
 - Work item links must be properly configured in Azure DevOps
+
+## Deployment
+
+This project is deployed using GitHub Pages. To deploy your own instance:
+
+1. Fork this repository
+2. Go to your repository settings
+3. Navigate to "Pages" in the sidebar
+4. Select the branch you want to deploy (usually `main` or `master`)
+5. Save the settings
+
+Your site will be available at `https://lexejs.github.io/Scripts/`
 
 ## License
 
