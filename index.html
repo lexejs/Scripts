@@ -188,7 +188,12 @@
         <div class="form-row">
             <div class="form-group">
                 <label for="tag">Tag:</label>
-                <input type="text" id="tag" name="tag" value="AddToUat" required>
+                <input type="text" id="tag" name="tag" value="AddToUat" placeholder="Filter by tag">
+            </div>
+
+            <div class="form-group">
+                <label for="releaseId">Release ID:</label>
+                <input type="text" id="releaseId" name="releaseId" placeholder="Filter by Release ID">
             </div>
 
             <div class="form-group">
@@ -227,6 +232,7 @@
                 org: localStorage.getItem('azure_org'),
                 project: localStorage.getItem('azure_project'),
                 tag: localStorage.getItem('azure_tag'),
+                releaseId: localStorage.getItem('azure_releaseId'),
                 repoFilter: localStorage.getItem('azure_repoFilter'),
                 verifyBranch: localStorage.getItem('azure_verifyBranch'),
                 pat: localStorage.getItem('azure_pat'),
@@ -238,6 +244,7 @@
             if (savedParams.org) document.getElementById('org').value = savedParams.org;
             if (savedParams.project) document.getElementById('project').value = savedParams.project;
             if (savedParams.tag) document.getElementById('tag').value = savedParams.tag;
+            if (savedParams.releaseId) document.getElementById('releaseId').value = savedParams.releaseId;
             if (savedParams.repoFilter) document.getElementById('repoFilter').value = savedParams.repoFilter;
             if (savedParams.verifyBranch) document.getElementById('verifyBranch').value = savedParams.verifyBranch;
             if (savedParams.pat) document.getElementById('pat').value = savedParams.pat;
@@ -322,21 +329,28 @@
         async function getWorkItems() {
             const org = document.getElementById('org').value;
             const project = document.getElementById('project').value;
-            const tag = document.getElementById('tag').value;
+            const tag = document.getElementById('tag').value.trim();
+            const releaseId = document.getElementById('releaseId').value.trim();
             const pat = document.getElementById('pat').value;
             const repoFilter = document.getElementById('repoFilter').value.trim();
             const verifyBranch = document.getElementById('verifyBranch').value.trim();
             const isShort = document.getElementById('shortOutput').checked;
 
+            // Validate that at least one filter is provided
+            if (!tag && !releaseId) {
+                alert('Please provide either a Tag or Release ID to filter work items');
+                return;
+            }
+
             // Save all parameters to localStorage
             localStorage.setItem('azure_org', org);
             localStorage.setItem('azure_project', project);
             localStorage.setItem('azure_tag', tag);
+            localStorage.setItem('azure_releaseId', releaseId);
             localStorage.setItem('azure_repoFilter', repoFilter);
             localStorage.setItem('azure_verifyBranch', verifyBranch);
             localStorage.setItem('azure_pat', pat);
             localStorage.setItem('azure_shortOutput', isShort);
-
 
             const output = document.getElementById('output');
             const loading = document.getElementById('loading');
@@ -354,14 +368,24 @@
                 output.innerHTML = `<pre class="markdown"></pre>`;
                 const resultElement = output.querySelector('pre');
 
-                // Initial header
-                resultElement.textContent = `## Work items with tag: ${tag}\n\n`;
+                // Build WIQL query based on provided filters
+                let whereClause = '';
+                if (tag && releaseId) {
+                    whereClause = `WHERE ([System.Tags] CONTAINS '${tag}' OR [Custom.Release_ID] = '${releaseId}')`;
+                } else if (tag) {
+                    whereClause = `WHERE [System.Tags] CONTAINS '${tag}'`;
+                } else if (releaseId) {
+                    whereClause = `WHERE [Custom.Release_ID] = '${releaseId}'`;
+                }
 
-                // Get work items by tag
+                // Initial header
+                resultElement.textContent = `## Work items${tag ? ` with tag: ${tag}` : ''}${releaseId ? ` with Release ID: ${releaseId}` : ''}\n\n`;
+
+                // Get work items by tag or release ID
                 const wiqlQuery = {
                     query: `SELECT [System.Id], [System.Title], [System.WorkItemType]
                            FROM WorkItems
-                           WHERE [System.Tags] CONTAINS '${tag}'
+                           ${whereClause}
                            AND [System.WorkItemType] IN ('Product Backlog Item', 'Bug', 'Issue', 'Defect', 'Incident', 'Task')
                            ORDER BY [System.WorkItemType], [System.Id]`
                 };
