@@ -277,13 +277,35 @@ document.addEventListener('DOMContentLoaded', () => {
   function showOtherData1(obj, exclude, filename) {
     const copy = { ...obj };
     exclude.forEach(k => delete copy[k]);
-    otherDataDiv1.innerHTML = '<h3>Additional Data - ' + filename + '</h3><pre>' + JSON.stringify(copy, null, 2) + '</pre>';
+    otherDataDiv1.innerHTML = '';
+    const toggle = document.createElement('div');
+    toggle.textContent = filename + ' (click to toggle details)';
+    toggle.classList.add('clickable-title');
+    otherDataDiv1.appendChild(toggle);
+    const pre = document.createElement('pre');
+    pre.textContent = JSON.stringify(copy, null, 2);
+    pre.style.display = 'none';
+    otherDataDiv1.appendChild(pre);
+    toggle.addEventListener('click', () => {
+      pre.style.display = pre.style.display === 'none' ? 'block' : 'none';
+    });
   }
 
   function showOtherData2(obj, exclude, filename) {
     const copy = { ...obj };
     exclude.forEach(k => delete copy[k]);
-    otherDataDiv2.innerHTML = '<h3>Additional Data - ' + filename + '</h3><pre>' + JSON.stringify(copy, null, 2) + '</pre>';
+    otherDataDiv2.innerHTML = '';
+    const toggle = document.createElement('div');
+    toggle.textContent = filename + ' (click to toggle details)';
+    toggle.classList.add('clickable-title');
+    otherDataDiv2.appendChild(toggle);
+    const pre = document.createElement('pre');
+    pre.textContent = JSON.stringify(copy, null, 2);
+    pre.style.display = 'none';
+    otherDataDiv2.appendChild(pre);
+    toggle.addEventListener('click', () => {
+      pre.style.display = pre.style.display === 'none' ? 'block' : 'none';
+    });
   }
 
   function clearOtherData() { otherDataDiv1.innerHTML = ''; otherDataDiv2.innerHTML = ''; }

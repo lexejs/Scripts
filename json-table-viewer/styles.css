@@ -173,6 +173,25 @@ tr:hover {
     color: #2c3e50;
 }
 
+.clickable-title {
+  display: block;
+  width: 100%;
+  background-color: #eaf4ff;
+  padding: 5px;
+  border-radius: 4px;
+  color: #3498db;
+  text-decoration: underline;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clickable-title:hover {
+  background-color: #d0e8ff;
+  color: #2980b9;
+}
+
 .btn {
   display: inline-block;
   padding: 8px 15px;
