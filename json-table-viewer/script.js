@@ -115,7 +115,23 @@ document.addEventListener('DOMContentLoaded', () => {
         Value2: b.Value || ''
       };
     });
+    // default sort: bring differing rows to top
+    mergedRows.sort((a,b) => {
+      const diffA = a.Value1 !== a.Value2;
+      const diffB = b.Value1 !== b.Value2;
+      if (diffA && !diffB) return -1;
+      if (!diffA && diffB) return 1;
+      return 0;
+    });
     sortColumn = null;
+    // update secondary toggle with diff count and background
+    const diffSpan2 = document.getElementById('secondaryToggleDiff');
+    if (diffSpan2) {
+      const count = mergedRows.filter(r => r.Value1 !== r.Value2).length;
+      diffSpan2.textContent = count + ' diffs';
+      const toggle2 = diffSpan2.parentElement;
+      if (count) toggle2.classList.add('diff-present'); else toggle2.classList.remove('diff-present');
+    }
     renderMerged();
   }
 
@@ -240,6 +256,22 @@ document.addEventListener('DOMContentLoaded', () => {
     secondaryData.forEach(f=>map2[f.name]=f.value);
     const allNames = Array.from(new Set([...Object.keys(map1),...Object.keys(map2)]));
     compareFieldsRows = allNames.map((name,i)=>([i+1,name,map1[name]||'',map2[name]||'']));
+    // default sort: differing fields first
+    compareFieldsRows.sort((a,b) => {
+      const diffA = a[2] !== a[3];
+      const diffB = b[2] !== b[3];
+      if (diffA && !diffB) return -1;
+      if (!diffA && diffB) return 1;
+      return 0;
+    });
+    // update secondary toggle with diff count and background
+    const diffSpanF = document.getElementById('secondaryToggleDiff');
+    if (diffSpanF) {
+      const countF = compareFieldsRows.filter(c => c[2] !== c[3]).length;
+      diffSpanF.textContent = countF + ' diffs';
+      const toggleF = diffSpanF.parentElement;
+      if (countF) toggleF.classList.add('diff-present'); else toggleF.classList.remove('diff-present');
+    }
     renderCompareFields();
   }
 
@@ -296,8 +328,16 @@ document.addEventListener('DOMContentLoaded', () => {
     exclude.forEach(k => delete copy[k]);
     otherDataDiv2.innerHTML = '';
     const toggle = document.createElement('div');
-    toggle.textContent = filename + ' (click to toggle details)';
+    toggle.id = 'secondaryToggle';
     toggle.classList.add('clickable-title');
+    // filename and hint
+    const label = document.createElement('span');
+    label.textContent = filename + ' (click to toggle details)';
+    toggle.appendChild(label);
+    // diff count placeholder
+    const diffSpan = document.createElement('span');
+    diffSpan.id = 'secondaryToggleDiff';
+    toggle.appendChild(diffSpan);
     otherDataDiv2.appendChild(toggle);
     const pre = document.createElement('pre');
     pre.textContent = JSON.stringify(copy, null, 2);

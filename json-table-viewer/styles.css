@@ -135,6 +135,11 @@ tr:hover {
     background-color: #ffdddd;
 }
 
+.diff-present {
+  background-color: #ffe5e5 !important;
+  color: #c0392b;
+}
+
 .json-value {
     white-space: pre-wrap;
     word-break: break-word;
@@ -174,7 +179,9 @@ tr:hover {
 }
 
 .clickable-title {
-  display: block;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   width: 100%;
   background-color: #eaf4ff;
   padding: 5px;
@@ -182,14 +189,24 @@ tr:hover {
   color: #3498db;
   text-decoration: underline;
   cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .clickable-title:hover {
   background-color: #d0e8ff;
   color: #2980b9;
+}
+
+.clickable-title span:first-child {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.clickable-title span#secondaryToggleDiff {
+  flex: none;
+  margin-left: 10px;
+  white-space: nowrap;
 }
 
 .btn {
@@ -204,4 +221,9 @@ tr:hover {
 
 .btn:hover {
   background-color: #2980b9;
+}
+
+.instructions {
+  text-align: center;
+  margin-bottom: 20px;
 }
