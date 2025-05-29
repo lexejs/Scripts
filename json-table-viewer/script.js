@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
   const fileInput = document.getElementById('fileInput');
-  const loadSampleBtn = document.getElementById('loadSample');
   const headersRow = document.getElementById('headers');
   const tableBody = document.getElementById('tableBody');
   const otherDataDiv = document.getElementById('otherData');
@@ -9,31 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let sortColumn = null;
   let sortDir = 1;
 
-  const sampleData = {
-    "forms": [
-      {
-        "id": "00000000-0000-0000-0000-000000000000",
-        "jurisdiction": "US",
-        "taxYear": 2023,
-        "clientName": "Client A",
-        "underlyingEntityEin": "12-3456789",
-        "underlyingEntityName": "Entity A",
-        "recipientEin": "98-7654321",
-        "displayName": "Form A",
-        "formName": "1099-MISC",
-        "formType": "1099",
-        "formStatus": "Pending",
-        "importStatus": "Imported",
-        "notes": "Sample",
-        "reviewStatus": "Not Reviewed",
-        "attributes": { "a":1 },
-        "fields": []
-      }
-    ]
-  };
-
   fileInput.addEventListener('change', handleFile);
-  loadSampleBtn.addEventListener('click', () => loadData(sampleData.forms));
 
   function handleFile(e) {
     const f = e.target.files[0]; if (!f) return;
@@ -122,6 +97,5 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   function clearOtherData() { otherDataDiv.innerHTML = ''; }
 
-  // init
-  loadData(sampleData.forms);
+  // init: no initial load
 });
