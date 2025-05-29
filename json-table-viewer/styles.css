@@ -118,6 +118,10 @@ tr:hover {
     background-color: #e9ecef;
 }
 
+.diff-highlight {
+    background-color: #ffdddd;
+}
+
 .json-value {
     white-space: pre-wrap;
     word-break: break-word;

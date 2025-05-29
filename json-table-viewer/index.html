@@ -12,8 +12,11 @@
         <h1>JSON Table Viewer</h1>
         <div class="controls">
             <input type="file" id="fileInput" accept=".json">
+            <button id="compareJson">Compare JSON</button>
+            <input type="file" id="fileInput2" accept=".json" style="display:none">
         </div>
-        <div id="otherData" class="other-data"></div>
+        <div id="otherData1" class="other-data"></div>
+        <div id="otherData2" class="other-data"></div>
         <div class="table-container">
             <table id="jsonTable">
                 <thead>
