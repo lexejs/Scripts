@@ -9,11 +9,17 @@
 </head>
 <body>
     <div class="container">
-        <h1>JSON Table Viewer</h1>
+        <h1>JSON Comparator</h1>
+        <p class="instructions">Select a primary JSON file to view its data. Then upload a secondary file to compare values.</p>
         <div class="controls">
-            <input type="file" id="fileInput" accept=".json">
-            <button id="compareJson">Compare JSON</button>
-            <input type="file" id="fileInput2" accept=".json" style="display:none">
+            <div class="drop-zone" id="primaryDropZone">
+                <label for="fileInput" class="btn">Upload or Drop Primary JSON</label>
+                <input type="file" id="fileInput" accept=".json" style="display:none">
+            </div>
+            <div class="drop-zone" id="secondaryDropZone" style="display:none;">
+                <label for="fileInput2" class="btn">Upload or Drop Secondary JSON</label>
+                <input type="file" id="fileInput2" accept=".json" style="display:none">
+            </div>
         </div>
         <div id="otherData1" class="other-data"></div>
         <div id="otherData2" class="other-data"></div>

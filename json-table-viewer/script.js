@@ -5,8 +5,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const tableBody = document.getElementById('tableBody');
   const otherDataDiv1 = document.getElementById('otherData1');
   const otherDataDiv2 = document.getElementById('otherData2');
-  const compareBtn = document.getElementById('compareJson');
-
   let primaryData = null;
   let secondaryData = null;
   let mergedRows = [];
@@ -19,32 +17,57 @@ document.addEventListener('DOMContentLoaded', () => {
 
   fileInput.addEventListener('change', handlePrimary);
   fileInput2.addEventListener('change', handleSecondary);
-  compareBtn.addEventListener('click', () => fileInput2.click());
+
+  // drag-and-drop support for primary JSON
+  const dropZone = document.getElementById('primaryDropZone');
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('hover'); });
+  dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('hover'); });
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('hover');
+    const files = e.dataTransfer.files;
+    if (files.length) {
+      fileInput.files = files;
+      handlePrimary({ target: { files } });
+    }
+  });
+
+  // drag-and-drop for secondary JSON
+  const secondaryDropZone = document.getElementById('secondaryDropZone');
+  secondaryDropZone.addEventListener('dragover', e => { e.preventDefault(); secondaryDropZone.classList.add('hover'); });
+  secondaryDropZone.addEventListener('dragleave', () => { secondaryDropZone.classList.remove('hover'); });
+  secondaryDropZone.addEventListener('drop', e => {
+    e.preventDefault(); secondaryDropZone.classList.remove('hover');
+    const files = e.dataTransfer.files;
+    if (files.length) {
+      fileInput2.files = files;
+      handleSecondary({ target: { files } });
+    }
+  });
 
   function handlePrimary(e) {
     const f = e.target.files[0]; if (!f) return;
     const reader = new FileReader();
     reader.onload = () => {
-      try {
-        const j = JSON.parse(reader.result);
-        if (j.forms && Array.isArray(j.forms)) {
-          primaryForm = j.forms[0]; secondaryForm = null;
-          useFields = true;
-          primaryData = primaryForm.fields || [];
-          showOtherData1(primaryForm, ['fields'], f.name);
-          otherDataDiv2.innerHTML = '';
-          render();
-          return;
-        }
-        const items = j.forms || j.FormItems;
-        if (!items) { alert('Invalid JSON: expected "forms" or "FormItems"'); return; }
-        primaryForm = null; useFields = false;
-        primaryData = items;
-        showOtherData1(j, [j.forms ? 'forms':'FormItems'], f.name);
-        secondaryData = null;
+      // show secondary drop-zone
+      secondaryDropZone.style.display = 'block';
+      const j = JSON.parse(reader.result);
+      if (j.forms && Array.isArray(j.forms)) {
+        primaryForm = j.forms[0]; secondaryForm = null;
+        useFields = true;
+        primaryData = primaryForm.fields || [];
+        showOtherData1(primaryForm, ['fields'], f.name);
         otherDataDiv2.innerHTML = '';
         render();
-      } catch (err) { alert('Invalid JSON: '+err.message); }
+        return;
+      }
+      const items = j.forms || j.FormItems;
+      if (!items) { alert('Invalid JSON: expected "forms" or "FormItems"'); return; }
+      primaryForm = null; useFields = false;
+      primaryData = items;
+      showOtherData1(j, [j.forms ? 'forms':'FormItems'], f.name);
+      secondaryData = null;
+      otherDataDiv2.innerHTML = '';
+      render();
     };
     reader.readAsText(f);
   }
