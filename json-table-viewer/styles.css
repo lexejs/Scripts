@@ -1,0 +1,157 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f5f7fa;
+    color: #333;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+    color: #2c3e50;
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.controls {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+input[type="file"] {
+    padding: 8px 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: white;
+}
+
+button {
+    padding: 8px 15px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: #2980b9;
+}
+
+.table-container {
+    overflow-x: auto;
+    margin-top: 20px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+th, td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+}
+
+th:hover {
+    background-color: #e9ecef;
+}
+
+th.sorted-asc::after {
+    content: '\2191';
+    margin-left: 5px;
+    font-size: 12px;
+}
+
+th.sorted-desc::after {
+    content: '\2193';
+    margin-left: 5px;
+    font-size: 12px;
+}
+
+tr:hover {
+    background-color: #f8f9fa;
+}
+
+.expand-btn {
+    background: none;
+    border: none;
+    color: #3498db;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0 5px;
+}
+
+.nested-table {
+    width: 100%;
+    margin: 10px 0;
+    background-color: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+}
+
+.nested-table th {
+    background-color: #e9ecef;
+}
+
+.json-value {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.json-object, .json-array {
+    background-color: #f8f9fa;
+    padding: 10px;
+    border-radius: 4px;
+    border-left: 3px solid #3498db;
+    margin: 5px 0;
+}
+
+.json-string {
+    color: #2ecc71;
+}
+
+.json-number {
+    color: #e74c3c;
+}
+
+.json-boolean {
+    color: #9b59b6;
+}
+
+.json-null {
+    color: #7f8c8d;
+}
+
+.json-key {
+    color: #3498db;
+    font-weight: bold;
+}
+
+.json-brace {
+    color: #2c3e50;
+}
