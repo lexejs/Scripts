@@ -10,10 +10,17 @@ document.addEventListener('DOMContentLoaded', () => {
   let mergedRows = [];
   let sortColumn = null;
   let sortDir = 1;
-  let useFields = false;
   let primaryForm = null;
   let secondaryForm = null;
   let compareFieldsRows = [];
+  let showExtra = false;
+  const toggleExtra = document.getElementById('toggleExtra');
+  const toggleExtraDiv = document.querySelector('.toggle-extra');
+  toggleExtra.addEventListener('change', () => {
+    showExtra = toggleExtra.checked;
+    // rerender based on current state
+    if (secondaryData) compareAndRender(); else render();
+  });
 
   fileInput.addEventListener('change', handlePrimary);
   fileInput2.addEventListener('change', handleSecondary);
@@ -45,27 +52,36 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   function handlePrimary(e) {
+    // show secondary drop zone when primary JSON loaded
     const f = e.target.files[0]; if (!f) return;
     const reader = new FileReader();
     reader.onload = () => {
-      // show secondary drop-zone
       secondaryDropZone.style.display = 'block';
       const j = JSON.parse(reader.result);
-      if (j.forms && Array.isArray(j.forms)) {
-        primaryForm = j.forms[0]; secondaryForm = null;
-        useFields = true;
-        primaryData = primaryForm.fields || [];
-        showOtherData1(primaryForm, ['fields'], f.name);
-        otherDataDiv2.innerHTML = '';
-        render();
-        return;
+      let items, form;
+      if (j.forms && Array.isArray(j.forms[0].fields)) {
+        form = j.forms[0];
+        items = form.fields;
+      } else if (j.FormItems && Array.isArray(j.FormItems)) {
+        form = j;
+        items = j.FormItems;
+      } else {
+        return alert('Invalid JSON: expected "forms[0].fields" or "FormItems"');
       }
-      const items = j.forms || j.FormItems;
-      if (!items) { alert('Invalid JSON: expected "forms" or "FormItems"'); return; }
-      primaryForm = null; useFields = false;
-      primaryData = items;
-      showOtherData1(j, [j.forms ? 'forms':'FormItems'], f.name);
-      secondaryData = null;
+      primaryForm = form;
+      primaryData = items.map(item => ({
+        Key: item.Key || item.name || item.LayoutField || '',
+        Value: item.Value || item.value || item.FormattedValue || item.ExtractedValue || '',
+        LayoutField: item.LayoutField || item.scanCode || item.code || '',
+        ExtractedValue: item.ExtractedValue || item.value || '',
+        FormattedValue: item.FormattedValue || item.value || '',
+        ErrorMessage: item.ErrorMessage || '',
+        RowIndex: item.RowIndex || '',
+        Description: item.Description || item.description || '',
+        Code: item.Code || item.code || '',
+        ScanCode: item.ScanCode || item.scanCode || ''
+      }));
+      showOtherData1(form, j.forms ? ['fields'] : ['FormItems'], f.name);
       otherDataDiv2.innerHTML = '';
       render();
     };
@@ -73,26 +89,36 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function handleSecondary(e) {
+    // compare secondary JSON, similar mapping
     const f = e.target.files[0]; if (!f) return;
     const reader = new FileReader();
     reader.onload = () => {
-      try {
-        const j = JSON.parse(reader.result);
-        if (useFields && j.forms && Array.isArray(j.forms)) {
-          secondaryForm = j.forms[0];
-          secondaryData = secondaryForm.fields || [];
-          showOtherData2(secondaryForm, ['fields'], f.name);
-          compareFieldsAndRender();
-          return;
-        }
-        const items = j.forms || j.FormItems;
-        if (!items) { alert('Invalid JSON: expected "forms" or "FormItems"'); return; }
-        if (!primaryData) { alert('Load first JSON before comparing'); return; }
-        secondaryForm = null;
-        secondaryData = items;
-        showOtherData2(j, [j.forms ? 'forms':'FormItems'], f.name);
-        compareAndRender();
-      } catch (err) { alert('Invalid JSON: '+err.message); }
+      const j = JSON.parse(reader.result);
+      let items, form;
+      if (j.forms && Array.isArray(j.forms[0].fields)) {
+        form = j.forms[0];
+        items = form.fields;
+      } else if (j.FormItems && Array.isArray(j.FormItems)) {
+        form = j;
+        items = j.FormItems;
+      } else {
+        return alert('Invalid JSON: expected "forms[0].fields" or "FormItems"');
+      }
+      secondaryForm = form;
+      secondaryData = items.map(item => ({
+        Key: item.Key || item.name || item.LayoutField || '',
+        Value: item.Value || item.value || item.FormattedValue || item.ExtractedValue || '',
+        LayoutField: item.LayoutField || item.scanCode || item.code || '',
+        ExtractedValue: item.ExtractedValue || item.value || '',
+        FormattedValue: item.FormattedValue || item.value || '',
+        ErrorMessage: item.ErrorMessage || '',
+        RowIndex: item.RowIndex || '',
+        Description: item.Description || item.description || '',
+        Code: item.Code || item.code || '',
+        ScanCode: item.ScanCode || item.scanCode || ''
+      }));
+      showOtherData2(form, j.forms ? ['fields'] : ['FormItems'], f.name);
+      compareAndRender();
     };
     reader.readAsText(f);
   }
@@ -106,7 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
     mergedRows = allKeys.map((key, idx) => {
       const a = map1[key] || {};
       const b = map2[key] || {};
-      return {
+      const base = {
         row: idx+1,
         Key: key,
         RowIndex1: a.RowIndex || '',
@@ -114,6 +140,26 @@ document.addEventListener('DOMContentLoaded', () => {
         RowIndex2: b.RowIndex || '',
         Value2: b.Value || ''
       };
+      if (showExtra) {
+        return {
+          ...base,
+          LayoutField1: a.LayoutField || '',
+          Description1: a.Description || '',
+          Code1: a.Code || '',
+          ScanCode1: a.ScanCode || '',
+          ExtractedValue1: a.ExtractedValue || '',
+          FormattedValue1: a.FormattedValue || '',
+          ErrorMessage1: a.ErrorMessage || '',
+          LayoutField2: b.LayoutField || '',
+          Description2: b.Description || '',
+          Code2: b.Code || '',
+          ScanCode2: b.ScanCode || '',
+          ExtractedValue2: b.ExtractedValue || '',
+          FormattedValue2: b.FormattedValue || '',
+          ErrorMessage2: b.ErrorMessage || ''
+        };
+      }
+      return base;
     });
     // default sort: bring differing rows to top
     mergedRows.sort((a,b) => {
@@ -136,11 +182,22 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderMerged() {
+    toggleExtraDiv.style.display = (mergedRows && mergedRows.length) ? 'flex' : 'none';
     tableBody.innerHTML = '';
     headersRow.innerHTML = '';
     if (!mergedRows.length) return;
-    const keys = ['row','Key','RowIndex1','Value1','RowIndex2','Value2'];
-    keys.forEach(k => {
+    let keys;
+    if (showExtra) {
+      keys = ['row','Key',
+        'LayoutField1','Description1','Code1','ScanCode1','ExtractedValue1','FormattedValue1','ErrorMessage1','RowIndex1','Value1',
+        'LayoutField2','Description2','Code2','ScanCode2','ExtractedValue2','FormattedValue2','ErrorMessage2','RowIndex2','Value2'
+      ];
+    } else {
+      keys = ['row','Key','RowIndex1','Value1','RowIndex2','Value2'];
+    }
+    // filter out columns with no values (except row and Key)
+    const displayKeys = keys.filter(k => ['row','Key'].includes(k) || mergedRows.some(r => r[k] !== '' && r[k] !== null && r[k] !== undefined));
+    displayKeys.forEach(k => {
       const th = document.createElement('th');
       th.textContent = k + (sortColumn===k?(sortDir>0?' ↑':' ↓'): '');
       th.style.cursor = 'pointer';
@@ -149,12 +206,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     mergedRows.forEach(item => {
       const tr = document.createElement('tr');
-      keys.forEach(k => {
+      // highlight full row on difference
+      if (item.Value1 !== item.Value2) tr.classList.add('diff-highlight');
+      displayKeys.forEach(k => {
         const td = document.createElement('td');
         td.textContent = item[k];
-        if (k==='Value1' && item.Value1 !== item.Value2) {
-          td.classList.add('diff-highlight');
-        }
         tr.appendChild(td);
       });
       tableBody.appendChild(tr);
@@ -168,7 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function render() {
-    if (useFields) return renderFields();
+    toggleExtraDiv.style.display = (primaryData && primaryData.length) ? 'flex' : 'none';
     tableBody.innerHTML = '';
     headersRow.innerHTML = '';
     if (!primaryData || !primaryData.length) {
@@ -181,8 +237,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const keys = (primaryData[0].Key !== undefined) ? ['Key','RowIndex','Value']
-      : Object.keys(primaryData[0]).filter(k=>'fields'!==k);
+    let keys;
+    if (primaryData[0].Key !== undefined) {
+      keys = showExtra
+        ? ['Key','LayoutField','ExtractedValue','FormattedValue','ErrorMessage','RowIndex','Value']
+        : ['Key','RowIndex','Value'];
+    } else {
+      keys = Object.keys(primaryData[0]).filter(k => k!=='fields');
+    }
 
     const thIndex = document.createElement('th');
     thIndex.textContent = '#';
@@ -218,100 +280,12 @@ document.addEventListener('DOMContentLoaded', () => {
     return v;
   }
 
-  function renderFields() {
-    tableBody.innerHTML = '';
-    headersRow.innerHTML = '';
-    const keys = ['#','name','value'];
-    keys.forEach(k => {
-      const th = document.createElement('th');
-      th.textContent = k + (sortColumn===k?(sortDir>0?' ↑':' ↓'): '');
-      th.style.cursor = 'pointer';
-      th.addEventListener('click', () => sortFields(k));
-      headersRow.appendChild(th);
-    });
-    primaryData.forEach((field,i) => {
-      const tr = document.createElement('tr');
-      tr.insertCell().textContent = i+1;
-      tr.insertCell().textContent = field.name;
-      tr.insertCell().textContent = field.value;
-      tableBody.appendChild(tr);
-    });
-  }
-
-  function sortFields(col) {
-    if (sortColumn===col) sortDir=-sortDir; else { sortColumn=col; sortDir=1; }
-    primaryData.sort((a,b,i)=> {
-      let va, vb;
-      if (col==='#') { va = primaryData.indexOf(a); vb = primaryData.indexOf(b); }
-      else { va=a[col]; vb=b[col]; }
-      return (va>vb?1:-1)*sortDir;
-    });
-    renderFields();
-  }
-
-  function compareFieldsAndRender() {
-    const map1 = {};
-    primaryData.forEach(f=>map1[f.name]=f.value);
-    const map2 = {};
-    secondaryData.forEach(f=>map2[f.name]=f.value);
-    const allNames = Array.from(new Set([...Object.keys(map1),...Object.keys(map2)]));
-    compareFieldsRows = allNames.map((name,i)=>([i+1,name,map1[name]||'',map2[name]||'']));
-    // default sort: differing fields first
-    compareFieldsRows.sort((a,b) => {
-      const diffA = a[2] !== a[3];
-      const diffB = b[2] !== b[3];
-      if (diffA && !diffB) return -1;
-      if (!diffA && diffB) return 1;
-      return 0;
-    });
-    // update secondary toggle with diff count and background
-    const diffSpanF = document.getElementById('secondaryToggleDiff');
-    if (diffSpanF) {
-      const countF = compareFieldsRows.filter(c => c[2] !== c[3]).length;
-      diffSpanF.textContent = countF + ' diffs';
-      const toggleF = diffSpanF.parentElement;
-      if (countF) toggleF.classList.add('diff-present'); else toggleF.classList.remove('diff-present');
-    }
-    renderCompareFields();
-  }
-
-  function renderCompareFields() {
-    tableBody.innerHTML = '';
-    headersRow.innerHTML = '';
-    const keys = ['#','name','value1','value2'];
-    keys.forEach((k, idx) => {
-      const th = document.createElement('th');
-      th.textContent = k + (sortColumn===k?(sortDir>0?' ↑':' ↓'): '');
-      th.style.cursor = 'pointer';
-      th.addEventListener('click', () => sortCompareFields(k));
-      headersRow.appendChild(th);
-    });
-    compareFieldsRows.forEach(c=>{
-      const tr=document.createElement('tr');
-      c.forEach((cell,j)=>{
-        const td=tr.insertCell(); td.textContent=cell;
-        if(j>=2 && c[2]!==c[3]) td.classList.add('diff-highlight');
-      });
-      tableBody.appendChild(tr);
-    });
-  }
-
-  function sortCompareFields(col) {
-    if(sortColumn===col) sortDir=-sortDir; else { sortColumn=col; sortDir=1; }
-    const idx = ['#','name','value1','value2'].indexOf(col);
-    compareFieldsRows.sort((a,b)=>{
-      const va=a[idx], vb=b[idx];
-      return (va>vb?1:-1)*sortDir;
-    });
-    renderCompareFields();
-  }
-
   function showOtherData1(obj, exclude, filename) {
     const copy = { ...obj };
     exclude.forEach(k => delete copy[k]);
     otherDataDiv1.innerHTML = '';
     const toggle = document.createElement('div');
-    toggle.textContent = filename + ' (click to toggle details)';
+    toggle.textContent = filename + ' (click to toggle file details)';
     toggle.classList.add('clickable-title');
     otherDataDiv1.appendChild(toggle);
     const pre = document.createElement('pre');
@@ -332,7 +306,7 @@ document.addEventListener('DOMContentLoaded', () => {
     toggle.classList.add('clickable-title');
     // filename and hint
     const label = document.createElement('span');
-    label.textContent = filename + ' (click to toggle details)';
+    label.textContent = filename + ' (click to toggle file details)';
     toggle.appendChild(label);
     // diff count placeholder
     const diffSpan = document.createElement('span');
